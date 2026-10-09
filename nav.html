@@ -2,39 +2,25 @@
 <nav class="site-nav">
   <div class="nav-brand">项目总站</div>
   <div class="nav-menu">
-    <a href="index.html">首页导航</a>
-    <a href="Modbus调试工具v1.1.html">Modbus调试工具</a>
-    <a href="heartText.html">爱心文字</a>
-    <a href="/first_page/bird/bird.html">鸟群</a>
-    <a href="page3.html">页面三</a>
+    <!-- 关键修改：使用 / 开头，表示从服务器根目录开始寻找 -->
+    <a href="/index.html">首页导航</a>
+    <a href="/Modbus调试工具v1.1.html">Modbus调试工具</a>
+    <a href="/heartText.html">爱心文字</a>
+    <a href="/bird/bird.html">鸟群</a>
+    <a href="/page3.html">页面三</a>
   </div>
 </nav>
 
+<!-- CSS部分保持不变 -->
 <style>
 .site-nav {
   position: fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height: 60px;
+  top:0; left:0; width:100%; height: 60px;
   background: #24292f;
-  display: flex;
-  align-items: center;
-  padding:0 24px;
-  gap:32px;
-  z-index: 999;
+  display: flex; align-items: center;
+  padding:0 24px; gap:32px; z-index: 999;
 }
-.site-nav .nav-brand {
-  color:#fff;
-  font-size:19px;
-  font-weight:600;
-}
-.site-nav .nav-menu a {
-  color:#d1d9e0;
-  text-decoration: none;
-  margin:0 10px;
-}
-.site-nav .nav-menu a:hover {
-  color:#fff;
-}
+.site-nav .nav-brand { color:#fff; font-size:19px; font-weight:600; }
+.site-nav .nav-menu a { color:#d1d9e0; text-decoration: none; margin:0 10px; transition: color 0.2s; }
+.site-nav .nav-menu a:hover { color:#fff; }
 </style>

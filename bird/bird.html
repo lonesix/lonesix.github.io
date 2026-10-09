@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>鸟群算法</title>
+    <!-- 基准路径：依然是 / ，因为无论在多深的目录，根目录是不变的 -->
+    <base href="/">
 <style>
     * {
         margin: 0;
@@ -678,10 +680,38 @@
 
         const simulation = new BirdSimulation();
 
-        fetch('../nav.html')
+                fetch('/nav.html')
             .then(res => res.text())
-            .then(html => document.getElementById('nav-container').innerHTML = html)
+            .then(html => {
+                const navContainer = document.getElementById('nav-container');
+                navContainer.innerHTML = html;
+
+                // --- 自动修正导航栏路径的核心逻辑 ---
+                // 1. 获取当前网页的路径 (例如: /first_page/bird/bird.html 或 file:///.../first_page/bird/bird.html)
+                const currentPath = window.location.pathname;
+                
+                // 2. 计算当前页面距离网站根目录的深度
+                // 通过过滤掉前后的斜杠，然后按斜杠分割来计算层级
+                const depth = currentPath.replace(/^\/|\/$/g, '').split('/').length - 1;
+                
+                // 3. 根据深度生成要补充的前缀 (例如深度为2，前缀就是 "../../")
+                const prefix = depth > 0 ? '../'.repeat(depth) : './';
+
+                // 4. 遍历导航栏里的所有链接，自动补全路径
+                const links = navContainer.querySelectorAll('a');
+                links.forEach(link => {
+                    const originalHref = link.getAttribute('href');
+                    if (originalHref) {
+                        // 如果原本是以 / 开头的绝对路径，先去掉开头的 /
+                        const cleanHref = originalHref.startsWith('/') ? originalHref.slice(1) : originalHref;
+                        // 拼接上计算好的前缀
+                        link.href = prefix + cleanHref;
+                    }
+                });
+                // --- 修正逻辑结束 ---
+            })
             .catch(err => console.error("导航加载失败", err));
+
     </script>
 </body>
 </html>
