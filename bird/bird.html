@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鸟群算法</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background:#f6f8fa;
+        font-family: Arial, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 导航栏占位 */
+    #nav-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 1000;
+    }
+
+    /* 主内容区域 */
+    .main-content {
+        flex: 1;
+        padding: 80px 20px 40px;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+    }
+        
+    #canvas-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+    
+    canvas {
+        /* 移除了错误的 padding-top:90px，修复画布内部空白问题 */
+        border:1px solid #e71616;
+        background-color: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        cursor: crosshair;
+        max-width: 100%;
+        height: auto;
+    }
+
+    #control-panel {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    #control-panel h3 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        color: #333;
+        font-size: 18px;
+    }
+
+    .controls-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .control-group {
+        margin-bottom: 15px;
+    }
+
+    .control-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+        font-size: 14px;
+    }
+
+    .control-group input[type="range"] {
+        width: 100%;
+        margin-bottom: 5px;
+        -webkit-appearance: none;
+        height: 6px;
+        border-radius: 3px;
+        background: #ddd;
+        outline: none;
+    }
+
+    .control-group input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #e71616;
+        cursor: pointer;
+    }
+
+    .control-group span {
+        font-size: 12px;
+        color: #666;
+        display: block;
+    }
+
+    .checkbox-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+
+    #fps-counter {
+        position: fixed;
+        left: 20px;
+        top: 80px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 14px;
+        z-index: 1000;
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            padding: 80px 15px 20px;
+        }
+        .controls-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+</head>
+<body>
+    <div id="nav-container"></div>
+    
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="myCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <div id="control-panel">
+            <h3>控制面板</h3>
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label>鸟群数量: <span id="num-birds-value">30</span></label>
+                    <input type="range" id="num-birds" min="10" max="100" value="30">
+                </div>
+
+                <div class="control-group">
+                    <label>感知半径: <span id="perception-radius-value">200</span></label>
+                    <input type="range" id="perception-radius" min="20" max="300" value="200">
+                </div>
+
+                <div class="control-group">
+                    <label>最大速度: <span id="max-speed-value">3</span></label>
+                    <input type="range" id="max-speed" min="1" max="5" value="3" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>分离权重: <span id="separation-weight-value">1.5</span></label>
+                    <input type="range" id="separation-weight" min="0" max="3" value="1.5" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>对齐权重: <span id="alignment-weight-value">1.0</span></label>
+                    <input type="range" id="alignment-weight" min="0" max="3" value="1.0" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>聚合权重: <span id="cohesion-weight-value">1.0</span></label>
+                    <input type="range" id="cohesion-weight" min="0" max="3" value="1.0" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label>轨迹长度: <span id="trail-length-value">20</span></label>
+                    <input type="range" id="trail-length" min="0" max="50" value="20">
+                </div>
+
+                <div class="control-group">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="show-connections" checked>
+                        <label for="show-connections">显示连接线</label>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="mouse-leader" >
+                        <label for="mouse-leader">鼠标引导</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fps-counter">FPS: 0</div>
+
+    <script>
+        // ==================== 配置模块 ====================
+        const CONFIG = {
+            CANVAS_WIDTH: 800,
+            CANVAS_HEIGHT: 600,
+            NUM_BIRDS: 30,
+            BIRD_RADIUS: 5,
+            BIRD_COLOR: "blue",
+            BIRD_SPEED: 2,
+            PERCEPTION_RADIUS: 200,
+            MAX_SPEED: 3,
+            MAX_FORCE: 0.2,
+            SEPARATION_WEIGHT: 1.5,
+            ALIGNMENT_WEIGHT: 1.0,
+            COHESION_WEIGHT: 1.0,
+            BOUNDARY_MARGIN: 50,
+            TRAIL_LENGTH: 20,
+            SHOW_CONNECTIONS: true,
+            CONNECTION_DISTANCE: 80,
+            MOUSE_LEADER: false,
+            MOUSE_INFLUENCE: 100
+        };
+
+        // ==================== 鸟类定义模块 ====================
+        class Bird {
+            constructor(x, y, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.maxSpeed = CONFIG.MAX_SPEED;
+                this.maxForce = CONFIG.MAX_FORCE;
+                this.perceptionRadius = CONFIG.PERCEPTION_RADIUS;
+                this.trail = [];
+            }
+
+            draw(ctx) {
+                if (this.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = CONFIG.BIRD_COLOR + '30';
+                    ctx.lineWidth = 1;
+                    for (let i = 1; i < this.trail.length; i++) {
+                        ctx.moveTo(this.trail[i-1].x, this.trail[i-1].y);
+                        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                    ctx.stroke();
+                }
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                const angle = Math.atan2(this.vy, this.vx);
+                ctx.rotate(angle);
+                
+                ctx.beginPath();
+                ctx.ellipse(0, 0, CONFIG.BIRD_RADIUS * 1.5, CONFIG.BIRD_RADIUS * 0.8, 0, 0, Math.PI * 2);
+                ctx.fillStyle = CONFIG.BIRD_COLOR;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(CONFIG.BIRD_RADIUS * 1.2, 0, CONFIG.BIRD_RADIUS * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = CONFIG.BIRD_COLOR;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.ellipse(-CONFIG.BIRD_RADIUS * 0.3, -CONFIG.BIRD_RADIUS * 0.6, CONFIG.BIRD_RADIUS * 0.8, CONFIG.BIRD_RADIUS * 0.4, -Math.PI / 6, 0, Math.PI * 2);
+                ctx.fillStyle = CONFIG.BIRD_COLOR;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.ellipse(-CONFIG.BIRD_RADIUS * 0.3, CONFIG.BIRD_RADIUS * 0.6, CONFIG.BIRD_RADIUS * 0.8, CONFIG.BIRD_RADIUS * 0.4, Math.PI / 6, 0, Math.PI * 2);
+                ctx.fillStyle = CONFIG.BIRD_COLOR;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(CONFIG.BIRD_RADIUS * 1.8, 0);
+                ctx.lineTo(CONFIG.BIRD_RADIUS * 2.2, -CONFIG.BIRD_RADIUS * 0.3);
+                ctx.lineTo(CONFIG.BIRD_RADIUS * 2.2, CONFIG.BIRD_RADIUS * 0.3);
+                ctx.closePath();
+                ctx.fillStyle = "#FFA500";
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            distance(other) {
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+
+            separation(birds) {
+                let steering = { x: 0, y: 0 };
+                let total = 0;
+                for (let other of birds) {
+                    let d = this.distance(other);
+                    if (other !== this && d < this.perceptionRadius) {
+                        let diff = { x: this.x - other.x, y: this.y - other.y };
+                        diff.x /= d;
+                        diff.y /= d;
+                        steering.x += diff.x;
+                        steering.y += diff.y;
+                        total++;
+                    }
+                }
+                if (total > 0) {
+                    steering.x /= total;
+                    steering.y /= total;
+                    let mag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                    if (mag > 0) {
+                        steering.x = (steering.x / mag) * this.maxSpeed - this.vx;
+                        steering.y = (steering.y / mag) * this.maxSpeed - this.vy;
+                        let steerMag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                        if (steerMag > this.maxForce) {
+                            steering.x = (steering.x / steerMag) * this.maxForce;
+                            steering.y = (steering.y / steerMag) * this.maxForce;
+                        }
+                    }
+                }
+                return steering;
+            }
+
+            alignment(birds) {
+                let steering = { x: 0, y: 0 };
+                let total = 0;
+                for (let other of birds) {
+                    let d = this.distance(other);
+                    if (other !== this && d < this.perceptionRadius) {
+                        steering.x += other.vx;
+                        steering.y += other.vy;
+                        total++;
+                    }
+                }
+                if (total > 0) {
+                    steering.x /= total;
+                    steering.y /= total;
+                    let mag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                    if (mag > 0) {
+                        steering.x = (steering.x / mag) * this.maxSpeed - this.vx;
+                        steering.y = (steering.y / mag) * this.maxSpeed - this.vy;
+                        let steerMag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                        if (steerMag > this.maxForce) {
+                            steering.x = (steering.x / steerMag) * this.maxForce;
+                            steering.y = (steering.y / steerMag) * this.maxForce;
+                        }
+                    }
+                }
+                return steering;
+            }
+
+            cohesion(birds) {
+                let steering = { x: 0, y: 0 };
+                let total = 0;
+                for (let other of birds) {
+                    let d = this.distance(other);
+                    if (other !== this && d < this.perceptionRadius) {
+                        steering.x += other.x;
+                        steering.y += other.y;
+                        total++;
+                    }
+                }
+                if (total > 0) {
+                    steering.x /= total;
+                    steering.y /= total;
+                    steering.x -= this.x;
+                    steering.y -= this.y;
+                    let mag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                    if (mag > 0) {
+                        steering.x = (steering.x / mag) * this.maxSpeed - this.vx;
+                        steering.y = (steering.y / mag) * this.maxSpeed - this.vy;
+                        let steerMag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                        if (steerMag > this.maxForce) {
+                            steering.x = (steering.x / steerMag) * this.maxForce;
+                            steering.y = (steering.y / steerMag) * this.maxForce;
+                        }
+                    }
+                }
+                return steering;
+            }
+
+                        // 鼠标引导规则：作为领头鸟，全群跟随
+            mouseRule(mouseX, mouseY) {
+                if (!CONFIG.MOUSE_LEADER) return { x: 0, y: 0 };
+                
+                let steering = { x: 0, y: 0 };
+                
+                // 计算朝向鼠标位置的期望速度
+                steering.x = mouseX - this.x;
+                steering.y = mouseY - this.y;
+                
+                // 归一化并设为最大速度，得到期望速度向量
+                let mag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                if (mag > 0) {
+                    steering.x = (steering.x / mag) * this.maxSpeed;
+                    steering.y = (steering.y / mag) * this.maxSpeed;
+                    
+                    // 期望速度 - 当前速度 = 需要的转向力
+                    steering.x -= this.vx;
+                    steering.y -= this.vy;
+                    
+                    // 限制转向力，防止瞬间大角度掉头
+                    let steerMag = Math.sqrt(steering.x * steering.x + steering.y * steering.y);
+                    if (steerMag > this.maxForce) {
+                        steering.x = (steering.x / steerMag) * this.maxForce;
+                        steering.y = (steering.y / steerMag) * this.maxForce;
+                    }
+                }
+                
+                return steering;
+            }
+
+
+                       // 边界处理：平滑软边界，彻底解决打摆子问题
+            handleBoundaries(canvasWidth, canvasHeight) {
+                let margin = 50; // 边界缓冲区
+                let turnFactor = 0.4; // 基础转向加速度
+
+                // 左边界：越靠近左侧，向右的推力越大
+                if (this.x < margin) {
+                    // 使用平方让力在接近边缘时急剧增大，平滑推开
+                    let force = turnFactor * Math.pow((margin - this.x) / margin, 2);
+                    this.vx += force;
+                } 
+                // 右边界：越靠近右侧，向左的推力越大
+                else if (this.x > canvasWidth - margin) {
+                    let force = turnFactor * Math.pow((this.x - (canvasWidth - margin)) / margin, 2);
+                    this.vx -= force;
+                }
+
+                // 上边界：越靠近上侧，向下的推力越大
+                if (this.y < margin) {
+                    let force = turnFactor * Math.pow((margin - this.y) / margin, 2);
+                    this.vy += force;
+                } 
+                // 下边界：越靠近下侧，向上的推力越大
+                else if (this.y > canvasHeight - margin) {
+                    let force = turnFactor * Math.pow((this.y - (canvasHeight - margin)) / margin, 2);
+                    this.vy -= force;
+                }
+
+                // 极端越界保护（防止初始化或极端拉扯导致飞出太远）
+                // 只在飞出极远时才硬性拉回，日常运行不会触发
+                if (this.x < -50) this.x = -50;
+                if (this.x > canvasWidth + 50) this.x = canvasWidth + 50;
+                if (this.y < -50) this.y = -50;
+                if (this.y > canvasHeight + 50) this.y = canvasHeight + 50;
+            }
+
+
+
+
+
+
+            update(birds, canvasWidth, canvasHeight, mouseX, mouseY) {
+                let sep = this.separation(birds);
+                let ali = this.alignment(birds);
+                let coh = this.cohesion(birds);
+                let mouse = this.mouseRule(mouseX, mouseY);
+
+                sep.x *= CONFIG.SEPARATION_WEIGHT;
+                sep.y *= CONFIG.SEPARATION_WEIGHT;
+                ali.x *= CONFIG.ALIGNMENT_WEIGHT;
+                ali.y *= CONFIG.ALIGNMENT_WEIGHT;
+                coh.x *= CONFIG.COHESION_WEIGHT;
+                coh.y *= CONFIG.COHESION_WEIGHT;
+
+                this.vx += sep.x + ali.x + coh.x + mouse.x;
+                this.vy += sep.y + ali.y + coh.y + mouse.y;
+
+                let speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > this.maxSpeed) {
+                    this.vx = (this.vx / speed) * this.maxSpeed;
+                    this.vy = (this.vy / speed) * this.maxSpeed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > CONFIG.TRAIL_LENGTH) {
+                    this.trail.shift();
+                }
+
+                this.handleBoundaries(canvasWidth, canvasHeight);
+            }
+        }
+
+        // ==================== 鸟群管理模块 ====================
+        class BirdFlock {
+            constructor(config) {
+                this.birds = [];
+                this.config = config;
+                this.initializeFlock();
+            }
+
+            initializeFlock() {
+                this.birds = [];
+                for (let i = 0; i < this.config.NUM_BIRDS; i++) {
+                    this.birds.push(new Bird(
+                        Math.random() * this.config.CANVAS_WIDTH,
+                        Math.random() * this.config.CANVAS_HEIGHT,
+                        (Math.random() - 0.5) * this.config.BIRD_SPEED,
+                        (Math.random() - 0.5) * this.config.BIRD_SPEED
+                    ));
+                }
+            }
+
+            update(mouseX, mouseY) {
+                this.birds.forEach(bird => {
+                    bird.update(this.birds, this.config.CANVAS_WIDTH, this.config.CANVAS_HEIGHT, mouseX, mouseY);
+                });
+            }
+
+            draw(ctx) {
+                if (this.config.SHOW_CONNECTIONS) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < this.birds.length; i++) {
+                        for (let j = i + 1; j < this.birds.length; j++) {
+                            let d = this.birds[i].distance(this.birds[j]);
+                            if (d < this.config.CONNECTION_DISTANCE) {
+                                ctx.moveTo(this.birds[i].x, this.birds[i].y);
+                                ctx.lineTo(this.birds[j].x, this.birds[j].y);
+                            }
+                        }
+                    }
+                    ctx.stroke();
+                }
+                this.birds.forEach(bird => bird.draw(ctx));
+            }
+
+            // 修复核心逻辑：只有修改数量才重置，其他参数实时更新
+            updateConfig(newConfig) {
+                const needReinitialize = newConfig.NUM_BIRDS !== undefined && newConfig.NUM_BIRDS !== this.config.NUM_BIRDS;
+                
+                Object.assign(this.config, newConfig);
+                
+                // 实时更新现有鸟的物理属性
+                if (newConfig.MAX_SPEED !== undefined) {
+                    this.birds.forEach(bird => bird.maxSpeed = newConfig.MAX_SPEED);
+                }
+                if (newConfig.MAX_FORCE !== undefined) {
+                    this.birds.forEach(bird => bird.maxForce = newConfig.MAX_FORCE);
+                }
+                if (newConfig.PERCEPTION_RADIUS !== undefined) {
+                    this.birds.forEach(bird => bird.perceptionRadius = newConfig.PERCEPTION_RADIUS);
+                }
+                
+                // 只有数量改变时才重新生成
+                if (needReinitialize) {
+                    this.initializeFlock();
+                }
+            }
+        }
+
+        // ==================== 渲染引擎模块 ====================
+        class Renderer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.fps = 0;
+                this.frameCount = 0;
+                this.lastTime = performance.now();
+            }
+
+            clear() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            render(flock) {
+                this.clear();
+                flock.draw(this.ctx);
+                this.updateFPS();
+            }
+
+            updateFPS() {
+                this.frameCount++;
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                if (deltaTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / deltaTime);
+                    document.getElementById('fps-counter').textContent = `FPS: ${this.fps}`;
+                    this.frameCount = 0;
+                    this.lastTime = currentTime;
+                }
+            }
+        }
+
+        // ==================== 主应用模块 ====================
+        class BirdSimulation {
+            constructor() {
+                this.renderer = new Renderer('myCanvas');
+                this.flock = new BirdFlock(CONFIG);
+                this.mouseX = -100;
+                this.mouseY = -100;
+                this.setupEventListeners();
+                this.setupControls();
+                this.animate();
+            }
+
+                        setupEventListeners() {
+                const canvas = this.renderer.canvas;
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    // 处理画布缩放情况下的坐标映射
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    this.mouseX = (e.clientX - rect.left) * scaleX;
+                    this.mouseY = (e.clientY - rect.top) * scaleY;
+                });
+
+                // 鼠标进入画布时，根据控制面板状态恢复鼠标引导
+                canvas.addEventListener('mouseenter', () => {
+                    const checkbox = document.getElementById('mouse-leader');
+                    CONFIG.MOUSE_LEADER = checkbox.checked;
+                });
+
+                // 鼠标离开画布时，强制关闭鼠标引导
+                canvas.addEventListener('mouseleave', () => {
+                    this.mouseX = -1000; // 将坐标移至极远处
+                    this.mouseY = -1000;
+                    CONFIG.MOUSE_LEADER = false; // 核心修改：离开画布时关闭引导
+                });
+            }
+
+
+            setupControls() {
+                this.bindControl('num-birds', 'NUM_BIRDS', parseInt);
+                this.bindControl('perception-radius', 'PERCEPTION_RADIUS', parseInt);
+                this.bindControl('max-speed', 'MAX_SPEED', parseFloat);
+                this.bindControl('separation-weight', 'SEPARATION_WEIGHT', parseFloat);
+                this.bindControl('alignment-weight', 'ALIGNMENT_WEIGHT', parseFloat);
+                this.bindControl('cohesion-weight', 'COHESION_WEIGHT', parseFloat);
+                this.bindControl('trail-length', 'TRAIL_LENGTH', parseInt);
+
+                document.getElementById('show-connections').addEventListener('change', (e) => {
+                    this.flock.updateConfig({ SHOW_CONNECTIONS: e.target.checked });
+                });
+
+                document.getElementById('mouse-leader').addEventListener('change', (e) => {
+                    this.flock.updateConfig({ MOUSE_LEADER: e.target.checked });
+                });
+            }
+
+            // 提取公共绑定逻辑，减少代码冗余
+            bindControl(elementId, configKey, parser) {
+                const control = document.getElementById(elementId);
+                const valueDisplay = document.getElementById(elementId + '-value');
+                control.addEventListener('input', (e) => {
+                    const value = parser(e.target.value);
+                    valueDisplay.textContent = value;
+                    this.flock.updateConfig({ [configKey]: value });
+                });
+            }
+
+            animate() {
+                this.flock.update(this.mouseX, this.mouseY);
+                this.renderer.render(this.flock);
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        const simulation = new BirdSimulation();
+
+        fetch('../nav.html')
+            .then(res => res.text())
+            .then(html => document.getElementById('nav-container').innerHTML = html)
+            .catch(err => console.error("导航加载失败", err));
+    </script>
+</body>
+</html>
