@@ -1,15 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>First Page</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lonesix的主页</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,sans-serif;}
+body {
+  padding-top:60px; /* 给固定导航栏留出空间 */
+  background:#f6f8fa;
+}
+.container {
+  max-width:1000px;
+  margin:0 auto;
+  padding:30px 20px;
+}
+h2 {margin-bottom:24px;color:#24292f;}
+.card-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px,1fr));
+  gap:20px;
+}
+.card {
+  background:#fff;
+  padding:20px;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  transition:0.2s;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+}
+.card h3 {margin-bottom:8px;color:#24292f;}
+.card p {color:#57606a;font-size:14px;margin-bottom:6px;margin-top:6px;}
+.card a {
+  color:#2563eb;
+  text-decoration:none;
+  font-weight:500;
+  
+}
+</style>
 </head>
 <body>
-    <h2>This is my first page</h2>
-    <script src="main.js"></script>
+<!-- 导航容器，JS会把nav.html加载到这里 -->
+<div id="nav-container"></div>
+
+<div class="container">
+  <h2>站内页面导航</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Modbus调试工具</h3>
+      <p>功能描述</p>
+      <a href="Modbus调试工具v1.1.html">进入Modbus调试工具</a>
+    </div>
+    <div class="card">
+      <h3>城市气象站点小时数据提取</h3>
+      <p>功能描述</p>
+      <a href="har文件筛选.html">https://citydev.gbqyun.com/<br>小时数据提取</a>
+      <p>教程</p>
+      <a href="https://my.feishu.cn/wiki/HKAbwqOAuizVhKknjtYcJZCKnmh?from=from_copylink"target="_blank" rel="noopener noreferrer">har文件筛选导出工具教程</a>
+
+    </div>
+    <div class="card">
+      <h3>爱心文字</h3>
+      <p>功能描述</p>
+      <a href="heartText.html" id="heartTextLink">爱心文字</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// 加载公共导航
+fetch('nav.html')
+.then(res=>res.text())
+.then(html=>{
+  document.getElementById('nav-container').innerHTML = html;
+})
+.catch(err=>console.error("导航加载失败",err));
+
+// 获取链接元素
+const link = document.getElementById('heartTextLink');
+
+// 监听点击事件
+link.addEventListener('click', function(event) {
+  // 1. 阻止 <a> 标签的默认跳转行为
+  event.preventDefault();
+
+  // 2. 获取基础链接地址 (即 heartText.html)
+  const baseUrl = this.href; 
+
+  // 3. 检查当前页面的 URL 是否已经带有 ?text 参数
+  const currentParams = new URLSearchParams(window.location.search);
+  const existingText = currentParams.get('text');
+
+  let finalUrl = baseUrl;
+
+  if (existingText) {
+    // 如果当前页面已经有 text 参数，直接拼接到目标链接上继续传递
+    finalUrl += `?text=${encodeURIComponent(existingText)}`;
+  } else {
+    // 如果没有 text 参数，弹出输入框请求用户输入
+    const userInput = prompt("请输入要生成的文字：", "点击输入文字"); // "默认"是输入框的初始值
+
+    // 如果用户输入了内容（注意：prompt 返回 null 表示点了取消，返回空字符串表示没输入直接点确定）
+    if (userInput !== null && userInput.trim() !== '') {
+      // 将用户输入的内容编码后拼接到 URL 上
+      finalUrl += `?text=${encodeURIComponent(userInput.trim())}`;
+    }
+    // 如果用户点了取消(userInput === null)或没输入内容，finalUrl 就是纯粹的 baseUrl，不带参数
+  }
+
+  // 4. 执行跳转
+  window.location.href = finalUrl;
+});
+
+</script>
 </body>
 </html>
-

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>HAR空气质量数据筛选导出工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px;
+            background: #f5f7fa;
+            padding-top:70px; /* 给固定导航栏留出空间 */
+            background:#f6f8fa;
+        }
+        .box {
+            background: #fff;
+            padding: 24px;
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+        .item {
+            flex: 1;
+            min-width: 180px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        #dropZone {
+            border: 2px dashed #409eff;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            color: #666;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #dropZone.active {
+            background: #ecf5ff;
+            border-color: #409eff;
+        }
+        button {
+            padding: 10px 22px;
+            background: #409eff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:disabled {
+            background: #b4d8f8;
+            cursor: not-allowed;
+        }
+        #resultInfo {
+            margin: 15px 0;
+            color: #222;
+        }
+        textarea {
+            width: 100%;
+            height: 220px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 6px;
+            resize: none;
+            font-family: monospace;
+        }
+        .tip {
+            font-size: 12px;
+            color: #999;
+            margin-top:4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航容器，JS会把nav.html加载到这里 -->
+    <div id="nav-container"></div>
+    <div class="box">
+        <p style="font-size: 26px;color: #f80000;">(仅供参考学习)</p>
+        <a href="https://my.feishu.cn/wiki/HKAbwqOAuizVhKknjtYcJZCKnmh?from=from_copylink"target="_blank" rel="noopener noreferrer"style="font-size: 26px;">har文件筛选导出工具教程</a>
+        <h2>🌤️ HAR空气质量抓包文件解析工具</h2>
+        <div class="row">
+            <div class="item">
+                <label>目标站点名称</label>
+                <input type="text" id="stationName" value="永明路" placeholder="如：北环路、宾水西道">
+            </div>
+            <div class="item">
+                <label>开始时间</label>
+                <input type="datetime-local" id="startTime">
+                <div class="tip">不填写则不限最早时间</div>
+            </div>
+            <div class="item">
+                <label>结束时间</label>
+                <input type="datetime-local" id="endTime">
+                <div class="tip">不填写则不限最晚时间</div>
+            </div>
+            <div class="item">
+                <label>预览条数</label>
+                <input type="number" id="previewNum" value="20" min="1" placeholder="预览展示条数">
+                <div class="tip">填写0为预览全部</div>
+            </div>
+        </div>
+
+        <div id="dropZone">
+            拖拽 .har 文件到此处 / 点击选择文件
+        </div>
+
+        <div id="resultInfo"></div>
+        <textarea id="preview" readonly placeholder="解析后数据预览会展示在这里..."></textarea>
+        <br><br>
+        <button id="exportBtn" disabled>导出CSV文件</button>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const preview = document.getElementById('preview');
+        const resultInfo = document.getElementById('resultInfo');
+        const exportBtn = document.getElementById('exportBtn');
+
+        let finalData = [];
+
+        // 拖拽事件
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => e.preventDefault());
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('active'));
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('active'));
+        });
+
+        // 接收HAR文件
+        dropZone.addEventListener('drop', e => {
+            const file = e.dataTransfer.files[0];
+            if (!file || !file.name.endsWith('.har')) {
+                alert('请上传后缀为 .har 的抓包文件');
+                return;
+            }
+            readHarFile(file);
+        });
+        dropZone.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.har';
+            input.onchange = e => readHarFile(e.target.files[0]);
+            input.click();
+        });
+
+        // 读取并解析HAR
+        function readHarFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const har = JSON.parse(e.target.result);
+                    parseHar(har);
+                } catch (err) {
+                    alert('HAR文件解析失败，文件损坏');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file, 'utf-8');
+        }
+
+        // 核心：遍历HAR请求，提取空气质量接口数据
+        function parseHar(har) {
+            const targetStation = document.getElementById('stationName').value.trim();
+            const startStr = document.getElementById('startTime').value;
+            const endStr = document.getElementById('endTime').value;
+            const showCount = parseInt(document.getElementById('previewNum').value) || 20;
+
+            const startTime = startStr ? new Date(startStr) : null;
+            const endTime = endStr ? new Date(endStr) : null;
+
+            let allRecords = [];
+
+            // 遍历所有请求记录
+            har.log.entries.forEach(entry => {
+                const respBody = entry.response.content?.text;
+                if (!respBody) return;
+                try {
+                    const json = JSON.parse(respBody);
+                    // 匹配接口格式 {"code":0,"message":"成功","data":{...}}
+                    if (json.code === 0 && json.data) {
+                        // 扁平化所有站点数据
+                        Object.values(json.data).forEach(stationArr => {
+                            allRecords = allRecords.concat(stationArr);
+                        });
+                    }
+                } catch (e) {}
+            });
+
+            // 筛选站点 + 时间区间（空时间不限制）
+            finalData = allRecords.filter(item => {
+                // 站点匹配
+                if (item.stationName !== targetStation) return false;
+                const recordTime = new Date(item.time);
+                // 开始时间不为空才校验
+                if (startTime && recordTime < startTime) return false;
+                // 结束时间不为空才校验
+                if (endTime && recordTime > endTime) return false;
+                return true;
+            }).sort((a, b) => new Date(a.time) - new Date(b.time));
+
+            // 预览截取逻辑
+            let previewList;
+            if (showCount <= 0) {
+                previewList = finalData;
+            } else {
+                previewList = finalData.slice(0, showCount);
+            }
+
+            // 预览渲染
+            let timeTip = "";
+            if (!startTime && !endTime) timeTip = "（未设置时间，导出全部时段）";
+            else if(startTime && !endTime) timeTip = `（起始：${startStr}，无结束限制）`;
+            else if(!startTime && endTime) timeTip = `（结束：${endStr}，无起始限制）`;
+            else timeTip = `（${startStr} ~ ${endStr}）`;
+
+            resultInfo.innerHTML = `✅ 解析完成，筛选出 <b>${finalData.length}</b> 条【${targetStation}】监测数据 ${timeTip}（预览${previewList.length}条）`;
+            preview.value = JSON.stringify(previewList, null, 2);
+            exportBtn.disabled = finalData.length === 0;
+        }
+
+        // 导出CSV
+        exportBtn.onclick = () => {
+            if (!finalData.length) return;
+            // CSV表头
+            const headers = ["监测时间","站点名称","AQI","PM2.5","PM10","O3","NO2","SO2","CO"];
+            const rows = finalData.map(row => [
+                row.time,
+                row.stationName,
+                row.aqi,
+                row.pm25,
+            	row.pm10,
+                row.o3,
+                row.no2,
+                row.so2,
+                row.co
+            ]);
+            // 拼接CSV
+            let csv = [headers, ...rows].map(line => line.join(",")).join("\n");
+            // 下载文件 UTF8-BOM 防止Excel乱码
+            const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "空气质量筛选数据.csv";
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        // 加载公共导航
+        fetch('nav.html')
+        .then(res=>res.text())
+        .then(html=>{
+        document.getElementById('nav-container').innerHTML = html;
+        })
+        .catch(err=>console.error("导航加载失败",err));
+    </script>
+</body>
+</html>
