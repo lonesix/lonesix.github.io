@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>设备监控 - 单页版</title>
+<style>
+    :root {
+        --primary: #1890ff;
+        --primary-dark: #096dd9;
+        --success: #52c41a;
+        --danger: #ff4d4f;
+        --warning: #faad14;
+        --text: #1f2329;
+        --text-2: #646a73;
+        --text-3: #8f959e;
+        --border: #e5e6eb;
+        --bg: #f5f7fa;
+        --card: #ffffff;
+        --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+        max-width: 760px;
+        margin: 0 auto;
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        box-shadow: 0 0 24px rgba(0, 0, 0, .06);
+        /* margin-top: 100px; */
+    }
+
+    /* 顶部标题 */
+    .app-header {
+        flex: none;
+        background: linear-gradient(135deg, #1890ff, #096dd9);
+        color: #fff;
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 60px;
+    }
+
+    .app-header h1 { font-size: 20px; font-weight: 600; letter-spacing: .5px; }
+
+    .app-header .subtitle {
+        font-size: 12px;
+        opacity: .85;
+        margin-top: 2px;
+    }
+
+    .api-badge {
+        flex: none;
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .18);
+        border: 1px solid rgba(255, 255, 255, .35);
+        white-space: nowrap;
+    }
+
+    .api-badge.ok { background: rgba(255, 255, 255, .9); color: #237804; border-color: transparent; }
+
+    /* 页面区域 */
+    .pages {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 16px 16px 24px;
+    }
+
+    .page { display: none; }
+    .page.active { display: block; animation: fade .18s ease; }
+
+    @keyframes fade {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* 卡片 */
+    .card {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 16px rgba(0, 0, 0, .04);
+    }
+
+    .card-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .card-title .sub { font-size: 12px; font-weight: 400; color: var(--text-3); }
+
+    /* 统计 */
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .stat {
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 12px 6px;
+        text-align: center;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    .stat .num {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .stat .label { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+
+    .stat.normal .num { color: var(--success); }
+    .stat.abnormal .num { color: var(--danger); }
+    .stat.time .num { font-size: 14px; padding-top: 6px; color: var(--text-2); }
+
+    /* 结果条 */
+    .result-bar {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        background: #e6f4ff;
+        color: #0958d9;
+        border: 1px solid #bae0ff;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13px;
+        margin-bottom: 14px;
+        word-break: break-all;
+    }
+
+    .result-bar.warn { background: #fffbe6; border-color: #ffe58f; color: #ad6800; }
+    .result-bar.empty { background: #fafafa; border-color: var(--border); color: var(--text-2); }
+
+    .hint {
+        font-size: 12px;
+        color: var(--text-3);
+        line-height: 1.6;
+    }
+
+    .hint.warn { color: #ad6800; }
+
+    .hint-link {
+        color: var(--primary);
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    /* 表格 */
+    .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+    thead th {
+        background: #fafbfc;
+        color: var(--text-2);
+        font-weight: 600;
+        text-align: left;
+        padding: 10px 12px;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+        padding: 11px 12px;
+        border-bottom: 1px solid #f0f1f3;
+        vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafcff; }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--text-2); }
+
+    .time { color: var(--text-2); white-space: nowrap; font-size: 12px; }
+
+    .empty-message {
+        text-align: center;
+        color: var(--text-3);
+        padding: 28px 12px !important;
+    }
+
+    /* 状态徽标 */
+    .badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .badge-normal { color: #237804; background: #f6ffed; border-color: #b7eb8f; }
+    .badge-abnormal { color: #a8071a; background: #fff1f0; border-color: #ffa39e; }
+    .badge-unknown { color: #8c8c8c; background: #fafafa; border-color: #d9d9d9; }
+
+    /* 按钮 */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 38px;
+        padding: 0 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--text);
+        font-size: 14px;
+        cursor: pointer;
+        transition: all .15s ease;
+        white-space: nowrap;
+    }
+
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(24, 144, 255, .25);
+    }
+
+    .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+    .btn-block { width: 100%; height: 44px; font-size: 15px; font-weight: 600; }
+
+    .btn-sm { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 6px; }
+
+    .btn-danger { color: var(--danger); border-color: #ffccc7; background: #fff2f0; }
+
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* 设置表单 */
+    .form-item { margin-bottom: 14px; }
+
+    .form-item label {
+        display: block;
+        font-size: 13px;
+        color: var(--text-2);
+        margin-bottom: 6px;
+    }
+
+    input[type="text"], input[type="time"], input[type="password"] {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--text);
+        font-size: 14px;
+        outline: none;
+        transition: border-color .15s, box-shadow .15s;
+    }
+
+    input[type="text"]:focus, input[type="time"]:focus, input[type="password"]:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(24, 144, 255, .12);
+    }
+
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+
+    .switch-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 4px 0 12px;
+    }
+
+    .switch-item:last-child { padding-bottom: 0; }
+
+    .switch-item .switch-label { font-size: 14px; }
+
+    .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: none; }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .switch .slider {
+        position: absolute;
+        inset: 0;
+        background: #d9d9d9;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background .2s;
+    }
+
+    .switch .slider::before {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform .2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+    }
+
+    .switch input:checked + .slider { background: var(--primary); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+
+    /* 设备管理 */
+    .device-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .device-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        background: #fff;
+    }
+
+    .device-main { min-width: 0; }
+
+    .device-name {
+        font-weight: 600;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .device-id { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+    .device-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        flex: none;
+    }
+
+    .device-actions { display: flex; gap: 6px; }
+
+    .add-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+
+    .add-form input { height: 38px; }
+
+    .list-loading { text-align: center; color: var(--text-3); padding: 24px 0; }
+
+    /* 底部导航 */
+    .tabbar {
+        flex: none;
+        display: flex;
+        background: #fff;
+        border-top: 1px solid var(--border);
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    }
+
+    .tab-item {
+        flex: 1;
+        border: none;
+        background: none;
+        padding: 6px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        color: var(--text-3);
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 10px;
+        transition: color .15s, background .15s;
+    }
+
+    .tab-item .tab-icon { font-size: 18px; line-height: 1; }
+    .tab-item.active { color: var(--primary); background: #e6f4ff; }
+
+    /* 加载遮罩 */
+    .loading-mask {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, .35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 90;
+    }
+
+    .loading-mask.hidden { display: none; }
+
+    .loading-box {
+        background: rgba(255, 255, 255, .97);
+        border-radius: 14px;
+        padding: 22px 26px;
+        text-align: center;
+        min-width: 150px;
+    }
+
+    .spinner {
+        width: 32px;
+        height: 32px;
+        margin: 0 auto 10px;
+        border: 3px solid #d6e4ff;
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-box p { font-size: 13px; color: var(--text-2); }
+
+    /* 轻提示 */
+    .toast {
+        position: fixed;
+        left: 50%;
+        top: 24px;
+        transform: translate(-50%, -16px);
+        max-width: 86vw;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: rgba(31, 35, 41, .92);
+        color: #fff;
+        font-size: 13px;
+        opacity: 0;
+        pointer-events: none;
+        transition: all .22s ease;
+        z-index: 120;
+        text-align: center;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.success { background: rgba(35, 120, 4, .95); }
+    .toast.error { background: rgba(168, 7, 26, .95); }
+    .toast.warning { background: rgba(173, 104, 0, .95); }
+
+    /* 弹窗 */
+    .dialog-mask {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, .45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 110;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s;
+    }
+
+    .dialog-mask.show { opacity: 1; pointer-events: auto; }
+
+    .dialog {
+        width: 100%;
+        max-width: 340px;
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px;
+        transform: translateY(8px);
+        transition: transform .2s;
+    }
+
+    .dialog-mask.show .dialog { transform: none; }
+
+    .dialog h3 { font-size: 16px; margin-bottom: 8px; }
+
+    .dialog p { font-size: 13px; color: var(--text-2); line-height: 1.7; margin-bottom: 18px; white-space: pre-wrap; }
+
+    .dialog .btn { width: 100%; }
+
+    @media (max-width: 400px) {
+        .stat-grid { grid-template-columns: repeat(2, 1fr); }
+        .add-form { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+</head>
+<body>
+    <div id="nav-container"></div>
+<div class="app">
+    <header class="app-header">
+        <div>
+            <h1>设备监控</h1>
+            <div class="subtitle">FastBee 设备在线状态核查</div>
+        </div>
+        <div class="api-badge" id="api-badge">未配置 API</div>
+    </header>
+
+    <main class="pages">
+        <!-- 监控页面 -->
+        <section class="page active" id="page-monitor">
+            <div class="stat-grid">
+                <div class="stat">
+                    <div class="num" id="stat-total">0</div>
+                    <div class="label">设备总数</div>
+                </div>
+                <div class="stat normal">
+                    <div class="num" id="stat-normal">0</div>
+                    <div class="label">正常</div>
+                </div>
+                <div class="stat abnormal">
+                    <div class="num" id="stat-abnormal">0</div>
+                    <div class="label">异常</div>
+                </div>
+                <div class="stat time">
+                    <div class="num" id="stat-time" title="">—</div>
+                    <div class="label">上次核查</div>
+                </div>
+            </div>
+
+            <div class="result-bar empty" id="check-result-display">检查结果：等待核查</div>
+
+            <div class="card" id="config-hint" style="display:none;">
+                <p class="hint warn">尚未配置 API，无法获取真实设备数据。</p>
+                <p class="hint" style="margin-top:6px;">请先到 <span class="hint-link" id="goto-settings-link">设置</span> 填写 API 地址与 Authorization Token。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span>设备状态</span>
+                    <span class="sub" id="monitor-count">0 台</span>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>设备名称</th>
+                                <th>设备编号</th>
+                                <th>状态</th>
+                                <th>核查时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monitor-tbody">
+                            <tr><td colspan="5" class="empty-message">暂无设备数据，请先在「设备管理」获取设备列表</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" id="check-now-btn">立即核查</button>
+        </section>
+
+        <!-- 设置页面 -->
+        <section class="page" id="page-settings">
+            <div class="card">
+                <div class="card-title">API 配置</div>
+                <div class="form-item">
+                    <label for="api-base-url">API 基础 URL</label>
+                    <input type="text" id="api-base-url" placeholder="例如：https://api.fastbee.com" autocomplete="off">
+                </div>
+                <div class="form-item">
+                    <label for="api-auth-token">Authorization Token</label>
+                    <input type="text" id="api-auth-token" placeholder="例如：Bearer eyJhbGciOi..." autocomplete="off">
+                </div>
+                <div class="form-item">
+                    <label for="api-key">API 密钥（可选）</label>
+                    <input type="text" id="api-key" placeholder="填写后保存" autocomplete="off">
+                </div>
+                <div class="btn-row">
+                    <button class="btn" id="test-api-connection">测试连接</button>
+                    <button class="btn btn-primary" id="save-api-config">保存配置</button>
+                </div>
+                <p class="hint" style="margin-top:10px;">测试连接会真实请求设备列表接口。若在浏览器直接打开本页，可能因跨域限制请求失败，建议在 HBuilderX 真机/模拟器中运行。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">自动监控设置</div>
+                <div class="switch-item">
+                    <span class="switch-label">启用自动监控</span>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-monitor-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="form-item">
+                    <label for="check-time">每日自动核查时间</label>
+                    <input type="time" id="check-time" value="09:00">
+                </div>
+                <p class="hint" id="next-check-hint">未启用自动监控</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">弹窗规则设置</div>
+                <div class="switch-item">
+                    <span class="switch-label">异常时弹窗提醒</span>
+                    <label class="switch">
+                        <input type="checkbox" id="error-popup-switch" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="switch-item">
+                    <span class="switch-label">正常时弹窗提醒</span>
+                    <label class="switch">
+                        <input type="checkbox" id="normal-popup-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- 设备管理页面 -->
+        <section class="page" id="page-devices">
+            <div class="card">
+                <div class="card-title">
+                    <span>设备列表</span>
+                    <span class="sub" id="device-count">0 台</span>
+                </div>
+                <div class="device-list" id="management-device-list">
+                    <p class="empty-message">暂无设备，请点击「获取设备列表」</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">添加设备</div>
+                <div class="add-form">
+                    <input type="text" id="new-device-name" placeholder="设备名称" autocomplete="off">
+                    <input type="text" id="new-device-id" placeholder="设备编号" autocomplete="off">
+                    <button class="btn btn-primary" id="add-device-btn">添加</button>
+                </div>
+            </div>
+
+            <button class="btn btn-block" id="fetch-devices-btn">获取设备列表</button>
+        </section>
+    </main>
+
+    <nav class="tabbar">
+        <button class="tab-item active" data-page="page-monitor">
+            <span class="tab-icon">📊</span>
+            <span>监控</span>
+        </button>
+        <button class="tab-item" data-page="page-devices">
+            <span class="tab-icon">📱</span>
+            <span>设备管理</span>
+        </button>
+        <button class="tab-item" data-page="page-settings">
+            <span class="tab-icon">⚙️</span>
+            <span>设置</span>
+        </button>
+    </nav>
+</div>
+
+<!-- 加载遮罩 -->
+<div class="loading-mask hidden" id="loading">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <p id="loading-text">核查中...</p>
+    </div>
+</div>
+
+<!-- 轻提示 -->
+<div class="toast" id="toast"></div>
+
+<!-- 结果弹窗 -->
+<div class="dialog-mask" id="dialog">
+    <div class="dialog">
+        <h3 id="dialog-title">提示</h3>
+        <p id="dialog-message"></p>
+        <button class="btn btn-primary" id="dialog-confirm">确定</button>
+    </div>
+</div>
+
+<script>
+    // 加载公共导航
+fetch('nav.html')
+.then(res=>res.text())
+.then(html=>{
+  document.getElementById('nav-container').innerHTML = html;
+})
+.catch(err=>console.error("导航加载失败",err));
+
+// 获取链接元素
+const link = document.getElementById('heartTextLink');
+(function () {
+    'use strict';
+
+    var CONFIG_KEY = 'deviceMonitorConfig';
+    var STATE_KEY = 'deviceMonitorSinglePageState';
+
+    var defaultConfig = {
+        api: { baseUrl: '', authToken: '', apiKey: '' },
+        app: {
+            autoCheckEnabled: false,
+            autoCheckTime: '09:00',
+            alertOnError: true,
+            alertOnNormal: false
+        },
+        devices: []
+    };
+
+    var config = loadConfig();
+    var state = loadState();
+    var checking = false;
+    var autoTimer = null;
+
+    /* ---------------- 工具函数 ---------------- */
+
+    function $(id) { return document.getElementById(id); }
+
+    function esc(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatDateTime(date) {
+        return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+            ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+    }
+
+    function deepMerge(target, source) {
+        Object.keys(source || {}).forEach(function (key) {
+            var value = source[key];
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+                deepMerge(target[key], value);
+            } else if (value !== undefined) {
+                target[key] = value;
+            }
+        });
+        return target;
+    }
+
+    function loadConfig() {
+        var base = JSON.parse(JSON.stringify(defaultConfig));
+        try {
+            var saved = localStorage.getItem(CONFIG_KEY);
+            if (saved) deepMerge(base, JSON.parse(saved));
+        } catch (e) {
+            console.warn('配置读取失败', e);
+        }
+        if (!Array.isArray(base.devices)) base.devices = [];
+        return base;
+    }
+
+    function saveConfig() {
+        try {
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        } catch (e) {
+            console.warn('配置保存失败', e);
+        }
+    }
+
+    function loadState() {
+        try {
+            var saved = localStorage.getItem(STATE_KEY);
+            if (saved) return JSON.parse(saved) || {};
+        } catch (e) {
+            console.warn('状态读取失败', e);
+        }
+        return {};
+    }
+
+    function saveState() {
+        try {
+            localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        } catch (e) {
+            console.warn('状态保存失败', e);
+        }
+    }
+
+    function isApiConfigured() {
+        return !!(config.api.baseUrl && config.api.authToken);
+    }
+
+    /* ---------------- 提示与弹窗 ---------------- */
+
+    var toastTimer = null;
+
+    function toast(message, type) {
+        var el = $('toast');
+        el.textContent = message;
+        el.className = 'toast show' + (type ? ' ' + type : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            el.className = 'toast';
+        }, 2600);
+    }
+
+    function showDialog(title, message) {
+        $('dialog-title').textContent = title;
+        $('dialog-message').textContent = message;
+        $('dialog').classList.add('show');
+    }
+
+    function showLoading(show, text) {
+        if (text) $('loading-text').textContent = text;
+        $('loading').classList.toggle('hidden', !show);
+    }
+
+    /* ---------------- API 请求 ---------------- */
+
+    function apiRequest(endpoint, options, apiCfg) {
+        var cfg = apiCfg || config.api;
+        options = options || {};
+
+        return new Promise(function (resolve, reject) {
+            if (!cfg.baseUrl) return reject(new Error('未配置 API 基础 URL'));
+            if (!cfg.authToken) return reject(new Error('未配置 Authorization Token'));
+
+            var url = cfg.baseUrl.replace(/\/+$/, '') + endpoint;
+            if (options.params) {
+                var pairs = [];
+                Object.keys(options.params).forEach(function (key) {
+                    pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(options.params[key]));
+                });
+                if (pairs.length) url += (url.indexOf('?') === -1 ? '?' : '&') + pairs.join('&');
+            }
+
+            var init = {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': cfg.authToken
+                }
+            };
+            if (options.body) init.body = JSON.stringify(options.body);
+
+            fetch(url, init).then(function (response) {
+                return response.text().then(function (text) {
+                    var data = null;
+                    if (text) {
+                        try { data = JSON.parse(text); } catch (e) { data = text; }
+                    }
+                    if (!response.ok) {
+                        var msg = (data && data.msg) || ('HTTP ' + response.status);
+                        return reject(new Error(msg));
+                    }
+                    resolve(data);
+                });
+            }).catch(function (err) {
+                reject(new Error('网络请求失败：' + (err && err.message ? err.message : err)));
+            });
+        });
+    }
+
+    function fetchApiDeviceList() {
+        return apiRequest('/prod-api/iot/device/shortList', {
+            params: { showChild: true, pageNum: 1, pageSize: 9999 }
+        }).then(function (res) {
+            if (!res || res.code !== 200) {
+                throw new Error((res && res.msg) || '获取设备列表失败');
+            }
+            var rows = res.rows || res.data || [];
+            if (!Array.isArray(rows)) rows = [];
+            return rows.map(function (item) {
+                return {
+                    id: item.id != null ? item.id : (item.deviceId != null ? item.deviceId : ''),
+                    name: item.name || item.deviceName || '未知设备',
+                    serialNumber: item.serialNumber || ''
+                };
+            }).filter(function (item) {
+                return item.id !== '' && item.id != null;
+            });
+        });
+    }
+
+    /* ---------------- 核查逻辑 ---------------- */
+
+    function checkDevice(device) {
+        var now = new Date();
+
+        return apiRequest('/prod-api/iot/device/listThingsModel', {
+            params: { deviceId: device.id, pageNum: 1, pageSize: 9999 }
+        }).then(function (modelRes) {
+            if (!modelRes || modelRes.code !== 200) {
+                throw new Error((modelRes && modelRes.msg) || '物模型查询失败');
+            }
+
+            var models = Array.isArray(modelRes.rows) ? modelRes.rows : [];
+            if (!models.length) {
+                return { deviceId: device.id, status: 'offline', message: '无物模型数据' };
+            }
+
+            var identifierList = models.map(function (model) {
+                return { identifier: model.identifier, type: model.type };
+            });
+            var beginTime = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+            return apiRequest('/prod-api/data/center/deviceHistory', {
+                method: 'POST',
+                body: {
+                    deviceId: device.id,
+                    serialNumber: models[0].serialNumber || device.serialNumber || '',
+                    identifierList: identifierList,
+                    beginTime: formatDateTime(beginTime),
+                    endTime: formatDateTime(now)
+                }
+            }).then(function (historyRes) {
+                var hasData = !!(historyRes && historyRes.code === 200 &&
+                    Array.isArray(historyRes.data) && historyRes.data.length > 0);
+                return {
+                    deviceId: device.id,
+                    status: hasData ? 'online' : 'offline',
+                    message: hasData ? '检查通过，有数据' : '检查失败，无数据'
+                };
+            });
+        }).catch(function (err) {
+            return {
+                deviceId: device.id,
+                status: 'error',
+                message: err && err.message ? err.message : '检查失败'
+            };
+        });
+    }
+
+    function applyResult(device, result) {
+        device.status = result.status === 'online' ? 'normal' : 'abnormal';
+        device.statusMessage = result.message;
+        device.lastCheckTime = formatDateTime(new Date());
+    }
+
+    function runCheck(isAuto) {
+        if (checking) {
+            toast('核查正在进行中');
+            return;
+        }
+        if (!isApiConfigured()) {
+            toast('请先在设置中配置 API', 'error');
+            switchPage('page-settings');
+            return;
+        }
+
+        checking = true;
+        showLoading(true, '核查中...');
+        $('check-now-btn').disabled = true;
+
+        var prepare = Promise.resolve();
+        if (!config.devices.length) {
+            prepare = fetchApiDeviceList().then(function (list) {
+                config.devices = list;
+                saveConfig();
+                renderAll();
+            });
+        }
+
+        prepare.then(function () {
+            if (!config.devices.length) {
+                toast('没有可核查的设备', 'error');
+                return null;
+            }
+            return Promise.all(config.devices.map(checkDevice));
+        }).then(function (results) {
+            if (!results) return;
+
+            var byId = {};
+            results.forEach(function (result) { byId[String(result.deviceId)] = result; });
+
+            var normal = 0;
+            var abnormal = 0;
+
+            config.devices.forEach(function (device) {
+                var result = byId[String(device.id)];
+                if (!result) return;
+                applyResult(device, result);
+                if (result.status === 'online') normal++;
+                else abnormal++;
+            });
+
+            saveConfig();
+
+            state.lastCheckTime = formatDateTime(new Date());
+            state.summary = { total: config.devices.length, normal: normal, abnormal: abnormal };
+            saveState();
+
+            renderAll();
+            toast('核查完成：共 ' + config.devices.length + ' 台，异常 ' + abnormal + ' 台',
+                abnormal > 0 ? 'warning' : 'success');
+            applyPopupRules(state.summary);
+        }).catch(function (err) {
+            toast('核查失败：' + err.message, 'error');
+        }).then(function () {
+            checking = false;
+            $('check-now-btn').disabled = false;
+            showLoading(false);
+        });
+    }
+
+    function recheckDevice(id) {
+        if (checking) {
+            toast('核查正在进行中');
+            return;
+        }
+        if (!isApiConfigured()) {
+            toast('请先在设置中配置 API', 'error');
+            switchPage('page-settings');
+            return;
+        }
+
+        var device = config.devices.find(function (item) {
+            return String(item.id) === String(id);
+        });
+        if (!device) return;
+
+        checking = true;
+        showLoading(true, '核查中...');
+
+        checkDevice(device).then(function (result) {
+            applyResult(device, result);
+            saveConfig();
+            renderAll();
+            toast(device.name + '：' + (result.status === 'online' ? '正常' : '异常') +
+                '（' + result.message + '）',
+                result.status === 'online' ? 'success' : 'warning');
+        }).catch(function (err) {
+            toast('核查失败：' + err.message, 'error');
+        }).then(function () {
+            checking = false;
+            showLoading(false);
+        });
+    }
+
+    function applyPopupRules(summary) {
+        if (!summary) return;
+        if (summary.abnormal > 0) {
+            if (config.app.alertOnError) {
+                showDialog('核查完成', '发现 ' + summary.abnormal + ' 台异常设备，请及时处理。');
+            }
+        } else if (config.app.alertOnNormal) {
+            showDialog('核查完成', '全部 ' + summary.total + ' 台设备状态正常。');
+        }
+    }
+
+    /* ---------------- 渲染 ---------------- */
+
+    function statusMeta(status) {
+        if (status === 'normal') return { text: '正常', cls: 'badge-normal' };
+        if (status === 'abnormal') return { text: '异常', cls: 'badge-abnormal' };
+        return { text: '未知', cls: 'badge-unknown' };
+    }
+
+    function renderAll() {
+        renderHeader();
+        renderStats();
+        renderMonitorTable();
+        renderDeviceList();
+        renderCheckResult();
+        renderConfigHint();
+    }
+
+    function renderHeader() {
+        var badge = $('api-badge');
+        badge.textContent = isApiConfigured() ? 'API 已配置' : '未配置 API';
+        badge.classList.toggle('ok', isApiConfigured());
+    }
+
+    function renderStats() {
+        var total = config.devices.length;
+        var normal = 0;
+        var abnormal = 0;
+
+        config.devices.forEach(function (device) {
+            if (device.status === 'normal') normal++;
+            else if (device.status === 'abnormal') abnormal++;
+        });
+
+        $('stat-total').textContent = total;
+        $('stat-normal').textContent = normal;
+        $('stat-abnormal').textContent = abnormal;
+
+        var timeEl = $('stat-time');
+        if (state.lastCheckTime) {
+            timeEl.textContent = state.lastCheckTime.slice(5, 16);
+            timeEl.title = state.lastCheckTime;
+        } else {
+            timeEl.textContent = '—';
+            timeEl.title = '';
+        }
+
+        $('monitor-count').textContent = total + ' 台';
+        $('device-count').textContent = total + ' 台';
+    }
+
+    function renderMonitorTable() {
+        var tbody = $('monitor-tbody');
+
+        if (!config.devices.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-message">暂无设备数据，请先在「设备管理」获取设备列表</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = config.devices.map(function (device) {
+            var meta = statusMeta(device.status);
+            return '<tr>' +
+                '<td>' + esc(device.name) + '</td>' +
+                '<td class="mono">' + esc(device.id) + '</td>' +
+                '<td><span class="badge ' + meta.cls + '">' + meta.text + '</span></td>' +
+                '<td class="time">' + esc(device.lastCheckTime || '未核查') + '</td>' +
+                '<td><button class="btn btn-sm" data-action="recheck" data-id="' + esc(device.id) + '">再次核查</button></td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function renderDeviceList() {
+        var container = $('management-device-list');
+
+        if (!config.devices.length) {
+            container.innerHTML = '<p class="empty-message">暂无设备，请点击「获取设备列表」</p>';
+            return;
+        }
+
+        container.innerHTML = config.devices.map(function (device) {
+            var meta = statusMeta(device.status);
+            return '<div class="device-item">' +
+                '<div class="device-main">' +
+                    '<div class="device-name">' + esc(device.name) + '</div>' +
+                    '<div class="device-id">编号：' + esc(device.id) + '</div>' +
+                '</div>' +
+                '<div class="device-side">' +
+                    '<span class="badge ' + meta.cls + '">' + meta.text + '</span>' +
+                    '<div class="device-actions">' +
+                        '<button class="btn btn-sm" data-action="edit" data-id="' + esc(device.id) + '">编辑</button>' +
+                        '<button class="btn btn-sm btn-danger" data-action="delete" data-id="' + esc(device.id) + '">删除</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    function renderCheckResult() {
+        var bar = $('check-result-display');
+
+        if (state.summary && state.lastCheckTime) {
+            bar.className = 'result-bar' + (state.summary.abnormal > 0 ? ' warn' : '');
+            bar.textContent = '检查结果：共检查 ' + state.summary.total + ' 台设备，异常 ' +
+                state.summary.abnormal + ' 台　检查时间：' + state.lastCheckTime;
+        } else {
+            bar.className = 'result-bar empty';
+            bar.textContent = '检查结果：等待核查';
+        }
+    }
+
+    function renderConfigHint() {
+        $('config-hint').style.display = isApiConfigured() ? 'none' : 'block';
+    }
+
+    function renderNextCheckHint() {
+        if (!config.app.autoCheckEnabled) {
+            $('next-check-hint').textContent = '未启用自动监控';
+            return;
+        }
+        if (!isApiConfigured()) {
+            $('next-check-hint').textContent = '自动监控已开启，等待配置 API';
+            return;
+        }
+        var next = getNextCheckTime();
+        $('next-check-hint').textContent = '下次自动核查：' + formatDateTime(next) + '（页面需保持打开）';
+    }
+
+    /* ---------------- 页面切换 ---------------- */
+
+    function switchPage(pageId) {
+        document.querySelectorAll('.page').forEach(function (page) {
+            page.classList.toggle('active', page.id === pageId);
+        });
+        document.querySelectorAll('.tab-item').forEach(function (tab) {
+            tab.classList.toggle('active', tab.dataset.page === pageId);
+        });
+        document.querySelector('.pages').scrollTop = 0;
+    }
+
+    /* ---------------- 设置 ---------------- */
+
+    function fillSettings() {
+        $('api-base-url').value = config.api.baseUrl || '';
+        $('api-auth-token').value = config.api.authToken || '';
+        $('api-key').value = config.api.apiKey || '';
+        $('auto-monitor-switch').checked = !!config.app.autoCheckEnabled;
+        $('check-time').value = config.app.autoCheckTime || '09:00';
+        $('error-popup-switch').checked = config.app.alertOnError !== false;
+        $('normal-popup-switch').checked = !!config.app.alertOnNormal;
+        renderNextCheckHint();
+    }
+
+    function saveApiConfig() {
+        var baseUrl = $('api-base-url').value.trim().replace(/\/+$/, '');
+        var authToken = $('api-auth-token').value.trim();
+        var apiKey = $('api-key').value.trim();
+
+        if (!baseUrl) {
+            toast('请输入 API 基础 URL', 'error');
+            return;
+        }
+        if (!authToken) {
+            toast('请输入 Authorization Token', 'error');
+            return;
+        }
+
+        config.api = { baseUrl: baseUrl, authToken: authToken, apiKey: apiKey };
+        saveConfig();
+        renderAll();
+        scheduleAutoCheck();
+        toast('API 配置已保存', 'success');
+    }
+
+    function testApiConnection() {
+        var baseUrl = $('api-base-url').value.trim().replace(/\/+$/, '');
+        var authToken = $('api-auth-token').value.trim();
+
+        if (!baseUrl || !authToken) {
+            toast('请先填写 API 地址和 Token', 'error');
+            return;
+        }
+
+        showLoading(true, '测试连接中...');
+        apiRequest('/prod-api/iot/device/shortList', {
+            params: { showChild: true, pageNum: 1, pageSize: 1 }
+        }, { baseUrl: baseUrl, authToken: authToken }).then(function (res) {
+            if (!res || res.code !== 200) {
+                throw new Error((res && res.msg) || '返回数据异常');
+            }
+            toast('连接成功，API 可用', 'success');
+        }).catch(function (err) {
+            toast('连接失败：' + err.message, 'error');
+        }).then(function () {
+            showLoading(false);
+        });
+    }
+
+    /* ---------------- 自动监控 ---------------- */
+
+    function getNextCheckTime() {
+        var parts = String(config.app.autoCheckTime || '09:00').split(':');
+        var hours = parseInt(parts[0], 10) || 0;
+        var minutes = parseInt(parts[1], 10) || 0;
+        var now = new Date();
+        var next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+        return next;
+    }
+
+    function scheduleAutoCheck() {
+        clearTimeout(autoTimer);
+        autoTimer = null;
+        renderNextCheckHint();
+
+        if (!config.app.autoCheckEnabled || !isApiConfigured()) return;
+
+        var delay = getNextCheckTime().getTime() - Date.now();
+        if (delay > 0) {
+            autoTimer = setTimeout(function () {
+                runCheck(true);
+                scheduleAutoCheck();
+            }, delay);
+        }
+    }
+
+    /* ---------------- 设备管理 ---------------- */
+
+    function addDevice() {
+        var name = $('new-device-name').value.trim();
+        var id = $('new-device-id').value.trim();
+
+        if (!name) {
+            toast('请输入设备名称', 'error');
+            return;
+        }
+        if (!id) {
+            toast('请输入设备编号', 'error');
+            return;
+        }
+        var exists = config.devices.some(function (device) {
+            return String(device.id) === id;
+        });
+        if (exists) {
+            toast('该设备编号已存在', 'error');
+            return;
+        }
+
+        config.devices.push({ id: id, name: name, serialNumber: '' });
+        saveConfig();
+        renderAll();
+
+        $('new-device-name').value = '';
+        $('new-device-id').value = '';
+        toast('设备已添加', 'success');
+    }
+
+    function editDevice(id) {
+        var device = config.devices.find(function (item) {
+            return String(item.id) === String(id);
+        });
+        if (!device) return;
+
+        var newName = prompt('请输入设备名称：', device.name);
+        if (newName === null) return;
+        var newId = prompt('请输入设备编号：', device.id);
+        if (newId === null) return;
+
+        newName = newName.trim();
+        newId = newId.trim();
+
+        if (!newName) {
+            toast('设备名称不能为空', 'error');
+            return;
+        }
+        if (!newId) {
+            toast('设备编号不能为空', 'error');
+            return;
+        }
+        var exists = config.devices.some(function (item) {
+            return String(item.id) === newId && String(item.id) !== String(device.id);
+        });
+        if (exists) {
+            toast('该设备编号已存在', 'error');
+            return;
+        }
+
+        device.name = newName;
+        device.id = newId;
+        saveConfig();
+        renderAll();
+        toast('设备信息已更新', 'success');
+    }
+
+    function deleteDevice(id) {
+        var device = config.devices.find(function (item) {
+            return String(item.id) === String(id);
+        });
+        if (!device) return;
+
+        if (!confirm('确定要删除设备「' + device.name + '」吗？')) return;
+
+        config.devices = config.devices.filter(function (item) {
+            return String(item.id) !== String(id);
+        });
+        saveConfig();
+        renderAll();
+        toast('设备已删除', 'success');
+    }
+
+    function syncDeviceList() {
+        if (!isApiConfigured()) {
+            toast('请先在设置中配置 API', 'error');
+            switchPage('page-settings');
+            return;
+        }
+        if (config.devices.length && !confirm('将使用服务器设备列表覆盖当前列表（已有核查状态会保留），是否继续？')) {
+            return;
+        }
+
+        showLoading(true, '获取设备列表...');
+        fetchApiDeviceList().then(function (list) {
+            var previous = {};
+            config.devices.forEach(function (device) { previous[String(device.id)] = device; });
+
+            config.devices = list.map(function (item) {
+                var old = previous[String(item.id)];
+                return {
+                    id: item.id,
+                    name: item.name,
+                    serialNumber: item.serialNumber || (old && old.serialNumber) || '',
+                    status: old && old.status,
+                    statusMessage: old && old.statusMessage,
+                    lastCheckTime: old && old.lastCheckTime
+                };
+            });
+
+            saveConfig();
+            renderAll();
+            toast('已获取 ' + list.length + ' 台设备', 'success');
+        }).catch(function (err) {
+            toast('获取失败：' + err.message, 'error');
+        }).then(function () {
+            showLoading(false);
+        });
+    }
+
+    /* ---------------- 事件绑定 ---------------- */
+
+    function bindEvents() {
+        document.querySelectorAll('.tab-item').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                switchPage(tab.dataset.page);
+            });
+        });
+
+        $('goto-settings-link').addEventListener('click', function () {
+            switchPage('page-settings');
+        });
+
+        $('check-now-btn').addEventListener('click', function () {
+            runCheck(false);
+        });
+
+        $('monitor-tbody').addEventListener('click', function (event) {
+            var btn = event.target.closest('button[data-action="recheck"]');
+            if (btn) recheckDevice(btn.dataset.id);
+        });
+
+        $('management-device-list').addEventListener('click', function (event) {
+            var btn = event.target.closest('button[data-action]');
+            if (!btn) return;
+            if (btn.dataset.action === 'edit') editDevice(btn.dataset.id);
+            if (btn.dataset.action === 'delete') deleteDevice(btn.dataset.id);
+        });
+
+        $('save-api-config').addEventListener('click', saveApiConfig);
+        $('test-api-connection').addEventListener('click', testApiConnection);
+
+        $('auto-monitor-switch').addEventListener('change', function (event) {
+            config.app.autoCheckEnabled = event.target.checked;
+            saveConfig();
+            scheduleAutoCheck();
+            toast(event.target.checked ? '已启用自动监控' : '已关闭自动监控');
+        });
+
+        $('check-time').addEventListener('change', function (event) {
+            config.app.autoCheckTime = event.target.value || '09:00';
+            saveConfig();
+            scheduleAutoCheck();
+        });
+
+        $('error-popup-switch').addEventListener('change', function (event) {
+            config.app.alertOnError = event.target.checked;
+            saveConfig();
+        });
+
+        $('normal-popup-switch').addEventListener('change', function (event) {
+            config.app.alertOnNormal = event.target.checked;
+            saveConfig();
+        });
+
+        $('add-device-btn').addEventListener('click', addDevice);
+        $('fetch-devices-btn').addEventListener('click', syncDeviceList);
+
+        $('dialog-confirm').addEventListener('click', function () {
+            $('dialog').classList.remove('show');
+        });
+        $('dialog').addEventListener('click', function (event) {
+            if (event.target === $('dialog')) $('dialog').classList.remove('show');
+        });
+
+        $('new-device-id').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') addDevice();
+        });
+    }
+
+    /* ---------------- 初始化 ---------------- */
+
+    fillSettings();
+    bindEvents();
+    renderAll();
+    scheduleAutoCheck();
+})();
+</script>
+</body>
+</html>
