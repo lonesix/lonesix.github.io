@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FastBee 物模型 2.7.2 → 2.9.0 转换工具</title>
+<style>
+:root{
+  --bg:#05070e;
+  --line:rgba(94,234,212,.14);
+  --line-strong:rgba(34,211,238,.45);
+  --txt:#e6edf7;
+  --muted:#8b9bb4;
+  --cyan:#22d3ee;
+  --violet:#a78bfa;
+  --lime:#a3e635;
+  --amber:#fbbf24;
+  --red:#f87171;
+  --radius:16px;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--txt);
+  font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-size:14px;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* ============ 背景层 ============ */
+#bg{position:fixed;inset:0;z-index:0;opacity:.55;pointer-events:none}
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.aurora i{
+  position:absolute;display:block;border-radius:50%;filter:blur(90px);opacity:.34;
+  animation:float 18s ease-in-out infinite;
+}
+.aurora i:nth-child(1){width:520px;height:520px;left:-140px;top:-160px;background:radial-gradient(circle,#0ea5e9,transparent 68%)}
+.aurora i:nth-child(2){width:460px;height:460px;right:-120px;top:120px;background:radial-gradient(circle,#7c3aed,transparent 68%);animation-delay:-6s}
+.aurora i:nth-child(3){width:420px;height:420px;left:38%;bottom:-220px;background:radial-gradient(circle,#06b6d4,transparent 68%);animation-delay:-11s}
+@keyframes float{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(40px,-30px,0) scale(1.12)}
+}
+/* 细网格 */
+.grid-mask{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(120,180,220,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,180,220,.05) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse at 50% 0%,#000 10%,transparent 72%);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 0%,#000 10%,transparent 72%);
+}
+
+/* ============ 导航栏（原 nav.html 内嵌，未改动源码） ============ */
+.site-nav {
+  position: fixed;
+  top:0; left:0; width:100%; height: 60px;
+  background: #24292f;
+  display: flex; align-items: center;
+  padding:0 24px; gap:32px; z-index: 999;
+}
+.site-nav .nav-brand { color:#fff; font-size:19px; font-weight:600; }
+.site-nav .nav-menu a { color:#d1d9e0; text-decoration: none; margin:0 10px; transition: color 0.2s; }
+.site-nav .nav-menu a:hover { color:#fff; }
+.site-nav{box-shadow:0 12px 30px -18px rgba(0,0,0,.9)}
+.site-nav .nav-menu a.active{color:#7ee8fa}
+.site-nav::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,.55),rgba(167,139,250,.55),transparent);
+}
+
+/* ============ 布局 ============ */
+.app{
+  position:relative;z-index:1;
+  max-width:1420px;margin:0 auto;
+  padding:96px 24px 40px;
+}
+.hero{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  flex-wrap:wrap;margin-bottom:22px;
+}
+.hero h1{
+  margin:0 0 10px;font-size:30px;letter-spacing:.5px;font-weight:700;
+  background:linear-gradient(100deg,#dffaff 0%,#67e8f9 28%,#c4b5fd 58%,#dffaff 100%);
+  background-size:220% auto;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:sheen 7s linear infinite;
+}
+@keyframes sheen{to{background-position:220% center}}
+.hero p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.7;max-width:720px}
+.hero p b{color:#7ee8fa;font-weight:600}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap}
+.pill{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:6px 12px;border-radius:999px;font-size:11.5px;letter-spacing:.4px;
+  color:#9fb4cc;border:1px solid rgba(120,180,220,.16);
+  background:rgba(12,20,34,.7);
+}
+.pill i{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.pill:nth-child(2) i{background:var(--violet);box-shadow:0 0 8px var(--violet)}
+.pill:nth-child(3) i{background:var(--lime);box-shadow:0 0 8px var(--lime)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);gap:18px}
+@media (max-width:1080px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.card{
+  position:relative;overflow:hidden;
+  background:linear-gradient(160deg,rgba(20,30,48,.86),rgba(8,13,23,.94));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+  backdrop-filter:blur(12px);
+  box-shadow:0 22px 46px -26px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.04);
+  animation:rise .5s cubic-bezier(.22,1,.36,1) both;
+}
+.card::after{
+  content:"";position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,.65),rgba(167,139,250,.65),transparent);
+  opacity:.8;
+}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card + .card{margin-top:18px}
+.side{display:flex;flex-direction:column;gap:18px}
+.side .card + .card{margin-top:0}
+
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-title{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;letter-spacing:.4px}
+.card-title .dot{
+  width:8px;height:8px;border-radius:2px;
+  background:linear-gradient(135deg,var(--cyan),var(--violet));
+  box-shadow:0 0 10px rgba(34,211,238,.75);
+}
+.card-title small{color:#64748b;font-weight:400;font-size:11.5px;letter-spacing:0}
+.hint{color:#64748b;font-size:11.5px}
+
+/* ============ FastBee 统计 ============ */
+.fb-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.fb-stat{
+  border:1px solid rgba(120,160,200,.14);border-radius:10px;
+  padding:10px 6px;text-align:center;background:rgba(6,12,22,.72);
+}
+.fb-stat b{display:block;font-size:20px;font-family:var(--mono);color:#67e8f9;line-height:1.25}
+.fb-stat span{font-size:11px;color:#64748b}
+.fb-stat:nth-child(2) b{color:#c4b5fd}
+.fb-stat:nth-child(3) b{color:#bef264}
+
+/* ============ 控件 ============ */
+.btn{
+  position:relative;overflow:hidden;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:36px;padding:0 16px;border-radius:10px;border:1px solid rgba(120,180,220,.22);
+  background:rgba(16,26,42,.9);color:#cfe0f2;font-size:13px;font-weight:500;
+  cursor:pointer;transition:transform .16s,box-shadow .16s,border-color .16s,background .16s;
+  font-family:inherit;white-space:nowrap;
+}
+.btn:hover{transform:translateY(-1px);border-color:rgba(34,211,238,.45);color:#fff}
+.btn:active{transform:translateY(0)}
+.btn::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.28),transparent 70%);
+  transform:translateX(-130%);transition:transform .6s ease;
+}
+.btn:hover::before{transform:translateX(130%)}
+.btn-primary{
+  border-color:transparent;color:#04121a;font-weight:600;
+  background:linear-gradient(135deg,#22d3ee,#60a5fa 55%,#a78bfa);
+  box-shadow:0 10px 26px -12px rgba(56,189,248,.9);
+}
+.btn-primary:hover{color:#020a10;box-shadow:0 14px 30px -12px rgba(56,189,248,1)}
+.btn-lime{
+  border-color:transparent;color:#0d1a03;font-weight:600;
+  background:linear-gradient(135deg,#bef264,#a3e635 55%,#65a30d);
+  box-shadow:0 10px 26px -12px rgba(163,230,53,.8);
+}
+.btn-lime:hover{color:#0b1500;box-shadow:0 14px 30px -12px rgba(163,230,53,.95)}
+.btn-ghost{background:transparent}
+.btn:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+.btn:disabled::before{display:none}
+.btn-sm{height:30px;padding:0 11px;font-size:12px;border-radius:8px}
+
+textarea{
+  width:100%;min-height:286px;padding:16px;
+  border-radius:12px;border:1px solid rgba(120,160,200,.16);
+  background:rgba(3,7,15,.9);color:#dbeafe;
+  font-family:var(--mono);font-size:12.5px;line-height:1.78;
+  resize:vertical;transition:border-color .2s,box-shadow .2s;
+  tab-size:2;
+}
+textarea::placeholder{color:#3f4f66}
+textarea:focus{
+  outline:none;border-color:rgba(34,211,238,.5);
+  box-shadow:0 0 0 3px rgba(34,211,238,.1),0 0 34px -12px rgba(34,211,238,.7);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.toolbar .spacer{flex:1}
+
+.drop-zone{border-radius:12px;transition:box-shadow .2s,border-color .2s}
+.drop-zone.dragging{
+  box-shadow:0 0 0 2px rgba(34,211,238,.5),0 0 40px -14px rgba(34,211,238,.9) inset;
+  border-radius:12px;
+}
+
+.status-line{
+  display:flex;align-items:center;gap:8px;margin-top:12px;
+  font-size:12px;color:#7c8ea6;font-family:var(--mono);
+  min-height:18px;flex-wrap:wrap;
+}
+.status-line .led{
+  width:7px;height:7px;border-radius:50%;background:#475569;flex:none;
+  transition:background .2s,box-shadow .2s;
+}
+.status-line.ok .led{background:var(--lime);box-shadow:0 0 10px var(--lime);animation:pulse 1.8s infinite}
+.status-line.err .led{background:var(--red);box-shadow:0 0 10px var(--red)}
+.status-line.warn .led{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.field{display:grid;gap:7px;margin-bottom:14px}
+.field label{font-size:12px;color:#8fa3bb;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.field label span{color:#5b6b82;font-size:11px}
+select,input[type=text]{
+  width:100%;height:36px;padding:0 12px;border-radius:10px;
+  background:rgba(5,10,20,.9);border:1px solid rgba(120,160,200,.18);
+  color:#d7e5f5;font-size:12.5px;font-family:inherit;
+  transition:border-color .2s,box-shadow .2s;
+}
+select:focus,input[type=text]:focus{
+  outline:none;border-color:rgba(34,211,238,.5);
+  box-shadow:0 0 0 3px rgba(34,211,238,.1);
+}
+select option{background:#0b1422;color:#d7e5f5}
+
+.switch-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 0;border-bottom:1px dashed rgba(120,160,200,.1);
+}
+.switch-row:last-of-type{border-bottom:none}
+.switch-row .txt{font-size:12.5px;color:#b6c6da}
+.switch-row .sub{display:block;font-size:11px;color:#5b6b82;margin-top:2px}
+.switch{position:relative;width:40px;height:22px;flex:none;cursor:pointer}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{
+  position:absolute;inset:0;border-radius:999px;background:#1b2637;
+  border:1px solid rgba(120,160,200,.2);transition:.22s;
+}
+.switch .track::after{
+  content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+  background:#64748b;transition:.22s;
+}
+.switch input:checked + .track{background:linear-gradient(135deg,#0891b2,#6d28d9);border-color:transparent}
+.switch input:checked + .track::after{transform:translateX(18px);background:#e0f7ff;box-shadow:0 0 10px rgba(34,211,238,.9)}
+
+.actions{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.actions .full{grid-column:1/-1}
+.tech-note{
+  margin-top:12px;font-size:11.5px;color:#5b6b82;line-height:1.7;
+  border-left:2px solid rgba(34,211,238,.35);padding-left:10px;
+}
+
+/* ============ 预览表格 ============ */
+.preview-scroll{
+  max-height:430px;overflow:auto;border-radius:12px;
+  border:1px solid rgba(120,160,200,.12);background:rgba(3,7,15,.55);
+}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+thead th{
+  position:sticky;top:0;z-index:2;
+  background:linear-gradient(180deg,#12203a,#0c1626);
+  color:#a9c3dc;font-weight:600;text-align:left;white-space:nowrap;
+  padding:10px 12px;border-bottom:1px solid rgba(34,211,238,.25);
+  font-size:11.5px;letter-spacing:.3px;
+}
+thead th .th-type{
+  display:inline-block;margin-left:7px;padding:1px 5px;border-radius:4px;
+  font-size:9.5px;font-weight:400;color:#7dd3fc;background:rgba(34,211,238,.1);
+  border:1px solid rgba(34,211,238,.2);vertical-align:middle;
+}
+tbody td{
+  padding:8px 12px;border-bottom:1px solid rgba(120,160,200,.06);
+  color:#c3d4e6;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+tbody tr:nth-child(even){background:rgba(255,255,255,.014)}
+tbody tr:hover{background:rgba(34,211,238,.06)}
+tbody tr:hover td{color:#eaf6ff}
+td.num{text-align:right;font-family:var(--mono);font-size:12px;color:#a5f3fc}
+td.bool{color:#c4b5fd}
+td.null{color:#3f4f66}
+tbody tr{animation:fadeRow .22s ease both}
+@keyframes fadeRow{from{opacity:0}to{opacity:1}}
+
+/* ============ 日志 ============ */
+.log-box{
+  height:230px;overflow:auto;border-radius:12px;
+  border:1px solid rgba(120,160,200,.12);background:rgba(2,5,11,.92);
+  padding:10px 12px;font-family:var(--mono);font-size:12px;line-height:1.75;
+}
+.log-line{display:flex;gap:9px;align-items:flex-start;animation:fadeRow .18s ease both;padding:1px 0}
+.log-time{color:#3f4f66;flex:none}
+.log-tag{
+  flex:none;width:48px;text-align:center;border-radius:4px;
+  font-size:9.5px;letter-spacing:.5px;padding:1px 0;margin-top:2px;
+  border:1px solid transparent;
+}
+.log-tag.info{color:#7dd3fc;background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.2)}
+.log-tag.ok{color:#bef264;background:rgba(163,230,53,.08);border-color:rgba(163,230,53,.22)}
+.log-tag.warn{color:#fbbf24;background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.22)}
+.log-tag.err{color:#f87171;background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.22)}
+.log-msg{color:#9fb4cc;word-break:break-word;white-space:pre-wrap}
+.log-tag.ok + .log-msg{color:#c9e8a8}
+.log-tag.err + .log-msg{color:#fca5a5}
+.log-tag.warn + .log-msg{color:#fcd34d}
+
+/* ============ 其它 ============ */
+.kbd{
+  display:inline-block;padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:11px;
+  border:1px solid rgba(120,160,200,.25);background:rgba(255,255,255,.04);color:#93a7bd;
+}
+.toast-wrap{position:fixed;right:22px;bottom:22px;z-index:1200;display:flex;flex-direction:column;gap:9px}
+.toast{
+  min-width:220px;max-width:340px;padding:11px 15px;border-radius:11px;
+  background:rgba(12,22,38,.96);border:1px solid rgba(34,211,238,.35);
+  color:#d8ecfa;font-size:12.5px;box-shadow:0 18px 40px -20px rgba(0,0,0,1);
+  animation:toastIn .28s cubic-bezier(.22,1,.36,1) both;
+}
+.toast.ok{border-color:rgba(163,230,53,.5)}
+.toast.err{border-color:rgba(248,113,113,.55)}
+@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+
+.empty{
+  padding:38px 16px;text-align:center;color:#465a72;font-size:12.5px;line-height:1.9;
+}
+footer{
+  position:relative;z-index:1;max-width:1420px;margin:0 auto;padding:26px 24px 40px;
+  color:#3f4f66;font-size:11.5px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+footer a{color:#5b7a96;text-decoration:none}
+
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(100,140,180,.22);border-radius:9px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(100,180,220,.42);background-clip:content-box}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="grid-mask"></div>
+
+<!-- ============================================================
+     ▼▼▼ 导航栏插槽：以下内容与 nav.html 完全一致（仅新增 active 类）
+     如需替换为其它导航，直接替换这一整段 <nav> 即可
+     ============================================================ -->
+<nav class="site-nav">
+  <div class="nav-brand">项目总站</div>
+  <div class="nav-menu">
+    <a href="/index.html">首页导航</a>
+    <a href="/Modbus调试工具v1.1.html">Modbus调试工具</a>
+    <a href="/heartText.html">爱心文字</a>
+    <a href="/bird/bird.html">鸟群</a>
+    <a href="/设备监控-单页版.html">fastbee设备监控</a>
+    <a href="/json2excel/FastBee物模型转换工具.html" class="active">FastBee物模型转换</a>
+  </div>
+</nav>
+<!-- ==================== 导航栏插槽结束 ==================== -->
+
+<main class="app">
+
+  <header class="hero">
+    <div>
+      <h1>FastBee 物模型 2.7.2 → 2.9.0</h1>
+      <p>粘贴 FastBee 2.7.2 产品物模型 JSON，自动解析 <b>properties / functions / events</b>，一键生成 2.9.0「物模型导入模板」<b>.xlsx</b>。全部计算在浏览器本地完成，<b>数据不出本机</b>，无需安装、无需上传。</p>
+    </div>
+    <div class="pill-row">
+      <span class="pill"><i></i>纯前端 · 零依赖</span>
+      <span class="pill"><i></i>本地生成 xlsx</span>
+      <span class="pill"><i></i>2.7.2 → 2.9.0</span>
+    </div>
+  </header>
+
+  <!-- 输入 + 配置 -->
+  <section class="layout">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="dot"></span>数据输入 <small>支持粘贴 / 拖拽 .json 文件</small></div>
+        <span class="hint"><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> 解析</span>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-sm" id="btnSample">载入示例</button>
+        <button class="btn btn-sm" id="btnPick">导入文件</button>
+        <button class="btn btn-sm btn-ghost" id="btnFormat">格式化</button>
+        <button class="btn btn-sm btn-ghost" id="btnClear">清空</button>
+        <span class="spacer"></span>
+        <span class="hint" id="charCount">0 字符</span>
+        <input type="file" id="fileInput" accept=".json,.txt,application/json" hidden>
+      </div>
+
+      <div class="drop-zone" id="dropZone">
+        <textarea id="jsonInput" spellcheck="false" placeholder='在此粘贴 FastBee 2.7.2 产品物模型 JSON，例如：
+{
+  "properties": [
+    {
+      "id": "temperature",
+      "name": "温度",
+      "isChart": 1,
+      "isMonitor": 1,
+      "isHistory": 1,
+      "isReadonly": 1,
+      "datatype": { "type": "decimal", "min": -21, "max": 100, "unit": "℃" }
+    }
+  ],
+  "functions": [],
+  "events": []
+}'></textarea>
+      </div>
+
+      <div class="status-line" id="statusLine">
+        <span class="led"></span><span id="statusText">等待粘贴 2.7.2 物模型 JSON</span>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><span class="dot"></span>FastBee 升级配置</div>
+        </div>
+
+        <div id="fastbeePanel">
+          <div class="fb-summary">
+            <div class="fb-stat"><b id="fbPropCount">0</b><span>属性 properties</span></div>
+            <div class="fb-stat"><b id="fbFuncCount">0</b><span>功能 functions</span></div>
+            <div class="fb-stat"><b id="fbEventCount">0</b><span>事件 events</span></div>
+          </div>
+
+          <div class="field">
+            <label>英文物模型名称 <span>模板第 2 列</span></label>
+            <select id="fbEnName">
+              <option value="id">使用标识符填充</option>
+              <option value="blank">留空（导出后手填）</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>布尔型有效值范围 <span>模板第 8 列</span></label>
+            <select id="fbBoolRange">
+              <option value="label">关闭/打开</option>
+              <option value="num">0/1</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>是否类字段取值 <span>第 10-14 列</span></label>
+            <select id="fbBoolValue">
+              <option value="num">1 / 0（推荐，避免导入丢值）</option>
+              <option value="cn">是 / 否（模板示例写法）</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>工作表名称 <span>≤31 字符</span></label>
+            <input type="text" id="fbSheetName" value="物模型导入模板" maxlength="31">
+          </div>
+
+          <div class="tech-note">
+            将 2.7.2 的 properties / functions / events 映射为 2.9.0「物模型导入模板」的 14 列，
+            按 属性 → 功能 → 事件 分组输出。是否类字段默认写 <b>1/0</b>：FastBee 导入端按 Integer 解析，
+            写「是/否」在部分版本会全部落成 0。
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><span class="dot"></span>执行</div>
+          <span class="hint" id="summaryHint">—</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary full" id="btnParse">转换为 2.9.0</button>
+          <button class="btn btn-lime" id="btnXlsx" disabled>导出 2.9.0 导入表</button>
+          <button class="btn" id="btnCsv" disabled>导出 CSV</button>
+        </div>
+        <div class="tech-note">
+          导出为原生 OOXML（.xlsx）压缩包，由本页直接拼装 ZIP 与工作表 XML 生成，
+          不加载任何第三方 CDN，断网可用。
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- 预览 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>2.9.0 导入表预览</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="hint" id="previewInfo">—</span>
+        <select id="previewLimit" style="width:104px;height:28px;font-size:11.5px">
+          <option value="50">前 50 行</option>
+          <option value="200" selected>前 200 行</option>
+          <option value="1000">前 1000 行</option>
+          <option value="999999">全部</option>
+        </select>
+      </div>
+    </div>
+    <div class="preview-scroll" id="previewWrap">
+      <div class="empty">暂无数据<br>点击「载入示例」可快速体验完整流程</div>
+    </div>
+  </section>
+
+  <!-- 日志 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>运行日志</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-ghost" id="btnCopyLog">复制日志</button>
+        <button class="btn btn-sm btn-ghost" id="btnClearLog">清空</button>
+      </div>
+    </div>
+    <div class="log-box" id="logBox"></div>
+  </section>
+
+</main>
+
+<footer>
+  <span>FastBee 物模型 2.7.2 → 2.9.0 转换工具 · 单文件离线版</span>
+  <span>快捷键：<span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> 解析 · <span class="kbd">Ctrl</span>+<span class="kbd">S</span> 导出</span>
+</footer>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* =========================================================
+   1. 基础工具
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const enc = new TextEncoder();
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+const state = {
+  flat: [],
+  columns: [],
+  prepared: false
+};
+
+/* FastBee 2.9.0「物模型导入模板」固定 14 列 */
+const FB_COLUMNS = [
+  '物模型名称', '英文物模型名称', '标识符', '数据类型', '计算公式', '排序值', '单位',
+  '有效值范围', '模型类别', '是否图表展示', '是否实时监测', '是否历史存储',
+  '是否只读数据', '是否设备分享权限'
+];
+const FB_TYPE_MAP = {
+  decimal: 'decimal', double: 'decimal', float: 'decimal', number: 'decimal',
+  integer: 'integer', int: 'integer', long: 'integer', short: 'integer',
+  bool: 'bool', boolean: 'bool',
+  enum: 'enum',
+  string: 'string', text: 'string', varchar: 'string',
+  array: 'array', struct: 'object', object: 'object'
+};
+const FB_KNOWN_TYPES = new Set(['decimal', 'integer', 'bool', 'enum', 'string', 'array', 'object']);
+
+/* =========================================================
+   2. 日志 / 提示
+   ========================================================= */
+const logBox = $('#logBox');
+
+function log(msg, level = 'info') {
+  const t = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}.${String(t.getMilliseconds()).padStart(3, '0')}`;
+  const tagMap = { info: 'INFO', ok: 'OK', warn: 'WARN', err: 'ERROR' };
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-time">${time}</span>` +
+    `<span class="log-tag ${level}">${tagMap[level] || 'INFO'}</span>` +
+    `<span class="log-msg"></span>`;
+  line.querySelector('.log-msg').textContent = msg;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
+  while (logBox.children.length > 400) logBox.removeChild(logBox.firstChild);
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  $('#toastWrap').appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .25s, transform .25s';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+    setTimeout(() => el.remove(), 260);
+  }, 2600);
+}
+
+function setStatus(text, type = '') {
+  const line = $('#statusLine');
+  line.className = 'status-line ' + type;
+  $('#statusText').textContent = text;
+}
+
+/* =========================================================
+   3. JSON 解析（含容错修复）
+   ========================================================= */
+function tryRepair(text) {
+  let t = text.trim();
+  if (!t) return null;
+  const before = t;
+  t = t.replace(/^\uFEFF/, '');
+  // 去除 // 与 /* */ 注释（简单实现，忽略字符串内情况）
+  t = t.replace(/\/\*[\s\S]*?\*\//g, '');
+  t = t.replace(/(^|[^:"'\\])\/\/[^\n\r]*/g, '$1');
+  // 去除对象/数组结尾多余逗号
+  t = t.replace(/,\s*([}\]])/g, '$1');
+  return t === before ? null : t;
+}
+
+function locateError(err, text) {
+  const m = /position\s+(\d+)/i.exec(err.message);
+  if (!m) return '';
+  const pos = Math.min(+m[1], text.length);
+  const before = text.slice(0, pos);
+  const line = before.split('\n').length;
+  const col = before.length - before.lastIndexOf('\n');
+  return `（第 ${line} 行，第 ${col} 列附近）`;
+}
+
+/* =========================================================
+   5. FastBee 2.7.2 → 2.9.0 物模型升级
+   ========================================================= */
+function extractThingModel(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const candidates = [data];
+  for (const k of ['thingsModel', 'thingModel', 'model', 'data', 'product']) {
+    const v = data[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) candidates.push(v);
+  }
+  for (const c of candidates) {
+    if (Array.isArray(c.properties) || Array.isArray(c.functions) ||
+        Array.isArray(c.services) || Array.isArray(c.events)) return c;
+  }
+  return null;
+}
+
+function fbYes(v) {
+  return v === 1 || v === '1' || v === true || v === 'true' || v === '是' || v === 'Y';
+}
+function fbSpecsText(specs) {
+  if (Array.isArray(specs)) {
+    return specs.map(s => {
+      if (s && typeof s === 'object') {
+        const k = s.value ?? s.key ?? s.id ?? s.val;
+        const label = s.name ?? s.label ?? s.text ?? s.desc ?? '';
+        return `${k ?? ''}:${label}`;
+      }
+      return String(s);
+    }).join('/');
+  }
+  if (specs && typeof specs === 'object') {
+    return Object.keys(specs).map(k => {
+      const v = specs[k];
+      const label = (v && typeof v === 'object') ? (v.name ?? v.label ?? v.text ?? '') : v;
+      return `${k}:${label}`;
+    }).join('/');
+  }
+  return '';
+}
+function fbType(t) {
+  const key = String(t || '').toLowerCase();
+  return FB_TYPE_MAP[key] || (key || 'string');
+}
+
+function parseModel(silent) {
+  const text = $('#jsonInput').value.trim();
+  if (!text) {
+    setStatus('等待粘贴 2.7.2 物模型 JSON');
+    resetResults();
+    if (!silent) log('请先粘贴 FastBee 2.7.2 物模型 JSON', 'warn');
+    return;
+  }
+
+  const t0 = performance.now();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    const fixed = tryRepair(text);
+    if (fixed) {
+      try {
+        data = JSON.parse(fixed);
+        log('JSON 含非标准写法，已自动修复后解析成功', 'warn');
+      } catch (e2) {
+        handleParseError(err, text);
+        return;
+      }
+    } else {
+      handleParseError(err, text);
+      return;
+    }
+  }
+
+  const model = extractThingModel(data);
+  if (!model) {
+    resetResults();
+    setStatus('未识别到物模型结构', 'err');
+    log('未识别到物模型结构：根对象需包含 properties / functions / events 数组（也支持 thingsModel 包裹）', 'err');
+    return;
+  }
+
+  const props = Array.isArray(model.properties) ? model.properties : [];
+  const funcs = Array.isArray(model.functions) ? model.functions
+    : (Array.isArray(model.services) ? model.services : []);
+  const events = Array.isArray(model.events) ? model.events : [];
+
+  if (!props.length && !funcs.length && !events.length) {
+    resetResults();
+    setStatus('物模型为空', 'warn');
+    log('物模型中 properties / functions / events 均为空，没有可转换的内容', 'warn');
+    return;
+  }
+
+  const enMode = $('#fbEnName').value;
+  const boolMode = $('#fbBoolRange').value;
+  const flagMode = $('#fbBoolValue').value;
+  const rows = [];
+  const ids = new Set();
+  const unknown = new Set();
+  let minusOne = 0;
+  let missingId = 0;
+
+  // FastBee 导入端按 Integer 解析，1/0 最稳妥；是/否在部分版本会因转换器问题丢值
+  function flag(v, def) {
+    const on = (v === undefined || v === null || v === '') ? def : fbYes(v);
+    if (flagMode === 'cn') return on ? '是' : '否';
+    return on ? '1' : '0';
+  }
+
+  function push(item, category) {
+    if (!item || typeof item !== 'object') return;
+    let id = item.id != null ? String(item.id).trim() : '';
+    if (!id) { missingId++; id = 'auto_' + (rows.length + 1); }
+    if (ids.has(id)) log(`标识符重复：${id}（第 ${rows.length + 1} 行）`, 'warn');
+    ids.add(id);
+
+    const dt = (item.datatype && typeof item.datatype === 'object') ? item.datatype
+      : ((item.dataType && typeof item.dataType === 'object') ? item.dataType : {});
+    const type = fbType(dt.type);
+    if (!FB_KNOWN_TYPES.has(type)) unknown.add(type);
+
+    const isNum = type === 'decimal' || type === 'integer';
+    if (isNum && dt.min === -1) minusOne++;
+
+    let range = '';
+    if (type === 'bool') {
+      range = fbSpecsText(dt.specs) || (boolMode === 'num' ? '0/1' : '关闭/打开');
+    } else if (type === 'enum') {
+      range = fbSpecsText(dt.specs);
+    } else if (type === 'string') {
+      range = dt.maxLength ? `0/${dt.maxLength}` : '';
+    } else if (isNum) {
+      const mn = dt.min, mx = dt.max;
+      range = (mn === undefined && mx === undefined) ? '' : `${mn ?? ''}/${mx ?? ''}`;
+    }
+
+    rows.push({
+      f0: item.name != null ? String(item.name) : id,
+      f1: enMode === 'id' ? id : '',
+      f2: id,
+      f3: type,
+      f4: '',
+      f5: '',
+      f6: dt.unit != null ? String(dt.unit) : '',
+      f7: range,
+      f8: category,
+      f9: flag(item.isChart, false),
+      f10: flag(item.isMonitor, false),
+      f11: flag(item.isHistory, true),
+      f12: flag(item.isReadonly, category === '属性'),
+      f13: flag(item.isSharePerm, false)
+    });
+  }
+
+  props.forEach(it => push(it, '属性'));
+  funcs.forEach(it => push(it, '功能'));
+  events.forEach(it => push(it, '事件'));
+
+  state.flat = rows;
+  state.columns = FB_COLUMNS.map((h, i) => ({ key: 'f' + i, header: h }));
+  state.prepared = true;
+
+  $('#fbPropCount').textContent = props.length;
+  $('#fbFuncCount').textContent = funcs.length;
+  $('#fbEventCount').textContent = events.length;
+
+  renderPreview();
+  updateSummary();
+  $('#btnXlsx').disabled = false;
+  $('#btnCsv').disabled = false;
+
+  setStatus(`已转换 ${rows.length} 项 · 属性 ${props.length} / 功能 ${funcs.length} / 事件 ${events.length}`, 'ok');
+  log(`物模型转换完成 · 属性 ${props.length} / 功能 ${funcs.length} / 事件 ${events.length} · 输出 ${rows.length} 行 × 14 列 · 耗时 ${(performance.now() - t0).toFixed(1)} ms`, 'ok');
+  log('映射规则：name→物模型名称，id→标识符/英文名，datatype.type→数据类型，unit→单位，min/max 或 specs→有效值范围');
+  log(`是否类字段按 ${flagMode === 'cn' ? '是/否' : '1/0'} 输出（FastBee 导入端按 Integer 解析，推荐 1/0）`);
+  if (missingId) log(`有 ${missingId} 项缺少 id，已用 auto_N 占位，请导出后修正`, 'warn');
+  if (unknown.size) log('未识别的数据类型：' + [...unknown].join('、') + '（已按原值输出，请核对）', 'warn');
+  if (minusOne) log(`有 ${minusOne} 个数值字段的 min 为 -1，若平台以 -1 表示“不限制”，请导出后在 Excel 中调整`, 'warn');
+}
+
+function handleParseError(err, text) {
+  const pos = locateError(err, text);
+  setStatus('JSON 语法错误' + pos, 'err');
+  log('JSON 解析失败：' + err.message + ' ' + pos, 'err');
+  state.prepared = false;
+  $('#btnXlsx').disabled = true;
+  $('#btnCsv').disabled = true;
+  toast('JSON 格式有误，请检查日志', 'err');
+}
+
+/* =========================================================
+   7. 预览与汇总
+   ========================================================= */
+function renderPreview() {
+  const wrap = $('#previewWrap');
+  if (!state.flat.length) {
+    wrap.innerHTML = '<div class="empty">暂无数据</div>';
+    $('#previewInfo').textContent = '—';
+    return;
+  }
+  const cols = state.columns;
+  const limit = +$('#previewLimit').value;
+  const rows = state.flat.slice(0, limit);
+
+  let html = '<table><thead><tr><th style="width:46px">#</th>' +
+    cols.map(c => `<th>${escapeHtml(c.header)}</th>`).join('') +
+    '</tr></thead><tbody>';
+
+  rows.forEach((r, i) => {
+    html += `<tr><td class="num" style="color:#3f4f66">${i + 1}</td>`;
+    for (const c of cols) {
+      const v = r[c.key];
+      if (v === null || v === undefined || v === '') {
+        html += '<td class="null">—</td>';
+      } else {
+        const s = String(v);
+        html += `<td title="${escapeAttr(s.length > 400 ? s.slice(0, 400) + '…' : s)}">${escapeHtml(s)}</td>`;
+      }
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  $('#previewInfo').textContent = `显示 ${rows.length} / ${state.flat.length} 行 · ${cols.length} 列`;
+}
+
+function updateSummary() {
+  $('#summaryHint').textContent = `${state.flat.length} 行 × ${state.columns.length} 列`;
+}
+
+function resetResults() {
+  state.flat = [];
+  state.prepared = false;
+  state.columns = [];
+  $('#previewWrap').innerHTML = '<div class="empty">暂无数据<br>点击「载入示例」可快速体验完整流程</div>';
+  $('#previewInfo').textContent = '—';
+  $('#summaryHint').textContent = '—';
+  $('#fbPropCount').textContent = '0';
+  $('#fbFuncCount').textContent = '0';
+  $('#fbEventCount').textContent = '0';
+  $('#btnXlsx').disabled = true;
+  $('#btnCsv').disabled = true;
+}
+
+/* =========================================================
+   8. XLSX 生成（零依赖：CRC32 + ZIP + OOXML）
+   ========================================================= */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function buildZip(entries) {
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() / 2 | 0)) & 0xFFFF);
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  for (const e of entries) {
+    const nameB = enc.encode(e.name);
+    const data = e.data;
+    const crc = crc32(data);
+
+    const lh = new Uint8Array(30 + nameB.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, nameB.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nameB, 30);
+    parts.push(lh, data);
+
+    const cd = new Uint8Array(46 + nameB.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, dosTime, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameB.length, true);
+    cv.setUint32(42, offset, true);
+    cd.set(nameB, 46);
+    central.push(cd);
+
+    offset += lh.length + data.length;
+  }
+
+  let cdSize = 0;
+  for (const c of central) cdSize += c.length;
+
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+
+  const out = new Uint8Array(offset + cdSize + 22);
+  let p = 0;
+  for (const part of parts) { out.set(part, p); p += part.length; }
+  for (const c of central) { out.set(c, p); p += c.length; }
+  out.set(eocd, p);
+  return out;
+}
+
+function colName(n) {
+  let s = '';
+  n += 1;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function xmlEsc(s) {
+  return String(s)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/'/g, '&#39;');
+}
+
+function visualLen(s) {
+  let n = 0;
+  for (const ch of String(s)) n += ch.charCodeAt(0) > 255 ? 2 : 1;
+  return n;
+}
+
+function cellXml(ref, val) {
+  if (val === null || val === undefined || val === '') return `<c r="${ref}"/>`;
+  let s = String(val);
+  if (s.length > 32000) s = s.slice(0, 32000) + '…';
+  return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(s)}</t></is></c>`;
+}
+
+function buildXlsx(rows, cols, sheetName) {
+  const MAX = 1048575;
+  const dataRows = rows.slice(0, MAX);
+
+  const widths = cols.map(c => {
+    let max = visualLen(c.header);
+    const n = Math.min(dataRows.length, 300);
+    for (let i = 0; i < n; i++) {
+      const v = dataRows[i][c.key];
+      if (v === null || v === undefined) continue;
+      const len = visualLen(typeof v === 'object' ? JSON.stringify(v) : v);
+      if (len > max) max = len;
+    }
+    return Math.min(48, Math.max(9, max + 3));
+  });
+
+  const colsXml = '<cols>' + widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>';
+
+  const rowXml = [];
+  rowXml.push('<row r="1" ht="24" customHeight="1">' +
+    cols.map((c, i) => `<c r="${colName(i)}1" t="inlineStr" s="3"><is><t xml:space="preserve">${xmlEsc(c.header)}</t></is></c>`).join('') +
+    '</row>');
+
+  for (let ri = 0; ri < dataRows.length; ri++) {
+    const r = dataRows[ri];
+    const rn = ri + 2;
+    let row = `<row r="${rn}">`;
+    for (let ci = 0; ci < cols.length; ci++) {
+      const c = cols[ci];
+      row += cellXml(`${colName(ci)}${rn}`, r[c.key]);
+    }
+    row += '</row>';
+    rowXml.push(row);
+  }
+
+  const lastRef = colName(cols.length - 1) + (dataRows.length + 1);
+  const safeName = xmlEsc((sheetName || '物模型导入模板').replace(/[[\]:*?/\\]/g, '_').slice(0, 31) || '物模型导入模板');
+
+  const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    `<dimension ref="A1:${lastRef}"/>` +
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+    '<sheetFormatPr defaultRowHeight="18"/>' +
+    colsXml +
+    `<sheetData>${rowXml.join('')}</sheetData>` +
+    `<autoFilter ref="A1:${lastRef}"/>` +
+    '</worksheet>';
+
+  const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+    '</Types>';
+
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>';
+
+  const workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    `<sheets><sheet name="${safeName}" sheetId="1" r:id="rId1"/></sheets>` +
+    '</workbook>';
+
+  const wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '</Relationships>';
+
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF14324B"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="4">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="22" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '</styleSheet>';
+
+  return buildZip([
+    { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+    { name: '_rels/.rels', data: enc.encode(rels) },
+    { name: 'xl/workbook.xml', data: enc.encode(workbook) },
+    { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(wbRels) },
+    { name: 'xl/styles.xml', data: enc.encode(styles) },
+    { name: 'xl/worksheets/sheet1.xml', data: enc.encode(sheetXml) }
+  ]);
+}
+
+/* =========================================================
+   9. 导出
+   ========================================================= */
+function download(bytes, filename, mime) {
+  const blob = new Blob([bytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function timestamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+function exportXlsx() {
+  const cols = state.columns;
+  if (!state.prepared || !state.flat.length) {
+    log('没有可导出的数据，请先转换物模型 JSON', 'warn');
+    toast('请先转换物模型', 'err');
+    return;
+  }
+
+  const t0 = performance.now();
+  const sheetName = $('#fbSheetName').value.trim() || '物模型导入模板';
+  log(`开始生成 XLSX · 工作表「${sheetName}」· ${state.flat.length} 行 × ${cols.length} 列`);
+
+  try {
+    const bytes = buildXlsx(state.flat, cols, sheetName);
+    const name = `物模型2.9.0_${timestamp()}.xlsx`;
+    download(bytes, name, XLSX_MIME);
+    const ms = (performance.now() - t0).toFixed(0);
+    log(`导出完成 · ${name} · ${(bytes.length / 1024).toFixed(1)} KB · 耗时 ${ms} ms`, 'ok');
+    setStatus(`已导出 ${state.flat.length} 行 × ${cols.length} 列`, 'ok');
+    toast('Excel 已生成，请查看下载');
+  } catch (e) {
+    log('导出失败：' + e.message, 'err');
+    toast('导出失败，请查看日志', 'err');
+  }
+}
+
+function exportCsv() {
+  const cols = state.columns;
+  if (!state.prepared || !state.flat.length) {
+    log('没有可导出的数据，请先转换物模型 JSON', 'warn');
+    toast('请先转换物模型', 'err');
+    return;
+  }
+
+  const t0 = performance.now();
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+
+  const lines = [cols.map(c => esc(c.header)).join(',')];
+  for (const r of state.flat) {
+    lines.push(cols.map(c => esc(r[c.key])).join(','));
+  }
+
+  const csv = '\uFEFF' + lines.join('\r\n');
+  const bytes = enc.encode(csv);
+  const name = `物模型2.9.0_${timestamp()}.csv`;
+  download(bytes, name, 'text/csv;charset=utf-8');
+  log(`CSV 导出完成 · ${name} · ${(bytes.length / 1024).toFixed(1)} KB · 耗时 ${(performance.now() - t0).toFixed(0)} ms`, 'ok');
+  toast('CSV 已生成（含 BOM，Excel 打开中文不乱码）');
+}
+
+/* =========================================================
+   10. 交互绑定
+   ========================================================= */
+const input = $('#jsonInput');
+
+// 字符计数
+function updateCharCount() {
+  const n = input.value.length;
+  $('#charCount').textContent = n ? n.toLocaleString() + ' 字符' : '0 字符';
+}
+
+// 输入自动解析（防抖）
+let debounceTimer = null;
+input.addEventListener('input', () => {
+  updateCharCount();
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => parseModel(true), 550);
+});
+
+// 按钮
+$('#btnParse').addEventListener('click', () => parseModel(false));
+
+$('#btnSample').addEventListener('click', () => {
+  input.value = JSON.stringify(FB_SAMPLE, null, 2);
+  updateCharCount();
+  log('已载入 FastBee 2.7.2 物模型示例（8 属性 + 4 功能 + 1 事件）', 'info');
+  parseModel(false);
+});
+
+$('#btnClear').addEventListener('click', () => {
+  input.value = '';
+  updateCharCount();
+  resetResults();
+  setStatus('已清空，等待粘贴 2.7.2 物模型 JSON');
+  log('已清空输入与转换结果', 'info');
+});
+
+$('#btnFormat').addEventListener('click', () => {
+  const text = input.value.trim();
+  if (!text) { log('没有可格式化的内容', 'warn'); return; }
+  try {
+    input.value = JSON.stringify(JSON.parse(text), null, 2);
+    updateCharCount();
+    log('JSON 已格式化为 2 空格缩进', 'ok');
+    parseModel(true);
+  } catch (e) {
+    const fixed = tryRepair(text);
+    if (fixed) {
+      try {
+        input.value = JSON.stringify(JSON.parse(fixed), null, 2);
+        updateCharCount();
+        log('JSON 含非标准写法，已修复并格式化', 'warn');
+        parseModel(true);
+        return;
+      } catch (_) { /* 继续走错误分支 */ }
+    }
+    log('格式化失败：' + e.message, 'err');
+    toast('不是有效的 JSON', 'err');
+  }
+});
+
+// 文件导入
+$('#btnPick').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) readFile(f);
+  e.target.value = '';
+});
+
+function readFile(file) {
+  if (file.size > 20 * 1024 * 1024) {
+    log('文件超过 20MB，建议改用文件工具预处理', 'warn');
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    input.value = String(reader.result);
+    updateCharCount();
+    log(`已读取文件：${file.name} · ${(file.size / 1024).toFixed(1)} KB`, 'ok');
+    parseModel(false);
+  };
+  reader.onerror = () => log('文件读取失败', 'err');
+  reader.readAsText(file, 'utf-8');
+}
+
+// 拖拽
+const dropZone = $('#dropZone');
+['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation();
+  dropZone.classList.add('dragging');
+}));
+['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); e.stopPropagation();
+  if (ev === 'dragleave' && dropZone.contains(e.relatedTarget)) return;
+  dropZone.classList.remove('dragging');
+}));
+dropZone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!f) return;
+  if (!/\.(json|txt)$/i.test(f.name)) {
+    log(`文件类型不支持：${f.name}（仅支持 .json / .txt）`, 'warn');
+    return;
+  }
+  readFile(f);
+});
+
+// FastBee 选项
+['#fbEnName', '#fbBoolRange', '#fbBoolValue'].forEach(sel => {
+  $(sel).addEventListener('change', () => {
+    if (state.prepared) parseModel(true);
+  });
+});
+
+$('#previewLimit').addEventListener('change', () => {
+  if (state.prepared) renderPreview();
+});
+
+// 导出
+$('#btnXlsx').addEventListener('click', exportXlsx);
+$('#btnCsv').addEventListener('click', exportCsv);
+
+// 日志
+$('#btnClearLog').addEventListener('click', () => { logBox.innerHTML = ''; log('日志已清空', 'info'); });
+$('#btnCopyLog').addEventListener('click', async () => {
+  const txt = $$('.log-line', logBox).map(l => l.textContent.replace(/\s+/g, ' ')).join('\n');
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('日志已复制到剪贴板');
+    log('日志已复制到剪贴板', 'ok');
+  } catch (e) {
+    log('复制失败：浏览器拒绝了剪贴板权限', 'warn');
+  }
+});
+
+// 快捷键
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    parseModel(false);
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    exportXlsx();
+  }
+});
+
+/* =========================================================
+   11. 示例数据
+   ========================================================= */
+/* FastBee 2.7.2 产品物模型示例（对应你提供的 JSON 模板，另补 bool/enum 示例） */
+const FB_SAMPLE = {
+  properties: [
+    {
+      id: 'chouqi', name: '臭气', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 100, min: -1, step: 1, type: 'decimal', unit: 'ou' }
+    },
+    {
+      id: 'wind', name: '风速', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 50, min: -1, step: 1, type: 'decimal', unit: 'm/s' }
+    },
+    {
+      id: 'wind_direction', name: '风向', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 8, min: -1, step: 1, type: 'integer', unit: '' }
+    },
+    {
+      id: 'humidity', name: '湿度', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 100, min: -1, step: 1, type: 'decimal', unit: '%' }
+    },
+    {
+      id: 'temperature', name: '温度', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 100, min: -21, step: 1, type: 'decimal', unit: '℃' }
+    },
+    {
+      id: 'pressure', name: '大气压', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 130, min: 90, step: 1, type: 'decimal', unit: 'kPa' }
+    },
+    {
+      id: 'airPumpPower', name: '气泵功率', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 100, min: 0, step: 1, type: 'decimal', unit: '' }
+    },
+    {
+      id: 'voc', name: '传感器校准系数', isChart: 1, isMonitor: 1, isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { max: 100, min: -1, step: 1, type: 'decimal', unit: 'ppm' }
+    }
+  ],
+  functions: [
+    {
+      id: 'restart_reason', name: '重启原因', isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { type: 'string', maxLength: 1024 }
+    },
+    {
+      id: '/productId/deviceNum', name: '目标调试设备主题前缀', isHistory: 1, isSharePerm: 1, isReadonly: 0,
+      datatype: { type: 'string', maxLength: 1024 }
+    },
+    {
+      id: 'switch', name: '设备开关', isHistory: 1, isSharePerm: 0, isReadonly: 0,
+      datatype: { type: 'bool' }
+    },
+    {
+      id: 'gear', name: '运行档位', isHistory: 1, isSharePerm: 0, isReadonly: 0,
+      datatype: { type: 'enum', specs: { 0: '低速档位', 1: '中速档位', 2: '中高速档位', 3: '高速档位' } }
+    }
+  ],
+  events: [
+    {
+      id: 'exception', name: '设备发生异常', isHistory: 1, isSharePerm: 1, isReadonly: 1,
+      datatype: { type: 'string', maxLength: 1024 }
+    }
+  ]
+};
+
+/* =========================================================
+   12. 背景动画（粒子网络）
+   ========================================================= */
+(function background() {
+  const canvas = $('#bg');
+  const ctx = canvas.getContext('2d');
+  let w = 0, h = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dots = [];
+  let raf = null;
+
+  function resize() {
+    w = canvas.width = Math.floor(innerWidth * dpr);
+    h = canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    const count = Math.max(26, Math.min(78, Math.floor(innerWidth / 20)));
+    dots = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.22 * dpr,
+      vy: (Math.random() - 0.5) * 0.22 * dpr,
+      r: (Math.random() * 1.5 + 0.6) * dpr
+    }));
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    const linkDist = 130 * dpr;
+
+    for (const d of dots) {
+      d.x += d.vx;
+      d.y += d.vy;
+      if (d.x < 0 || d.x > w) d.vx *= -1;
+      if (d.y < 0 || d.y > h) d.vy *= -1;
+    }
+
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const dx = dots[i].x - dots[j].x;
+        const dy = dots[i].y - dots[j].y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < linkDist) {
+          const a = (1 - dist / linkDist) * 0.16;
+          ctx.strokeStyle = `rgba(56,189,248,${a})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(dots[i].x, dots[i].y);
+          ctx.lineTo(dots[j].x, dots[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    for (const d of dots) {
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(103,232,249,.55)';
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    raf = requestAnimationFrame(frame);
+  }
+
+  function start() { if (!raf) raf = requestAnimationFrame(frame); }
+  function stop() { if (raf) { cancelAnimationFrame(raf); raf = null; } }
+
+  window.addEventListener('resize', () => { resize(); });
+  document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+
+  resize();
+  start();
+})();
+
+/* =========================================================
+   13. 启动
+   ========================================================= */
+updateCharCount();
+log('转换器已就绪 · 纯前端本地生成 xlsx，数据不会离开本机', 'ok');
+log('操作提示：载入示例 → 自动转换 → 导出 2.9.0 导入表');
+setStatus('等待粘贴 2.7.2 物模型 JSON');
+</script>
+</body>
+</html>
